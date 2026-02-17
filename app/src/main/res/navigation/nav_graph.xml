@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/mapFragment">
+
+    <fragment
+        android:id="@+id/mapFragment"
+        android:name="zaujaani.roadsensebasic.ui.map.MapFragment"
+        android:label="@string/title_map">
+
+        <action
+            android:id="@+id/action_mapFragment_to_summaryFragment"
+            app:destination="@id/summaryFragment" />
+        <action
+            android:id="@+id/action_mapFragment_to_settingsFragment"
+            app:destination="@id/settingsFragment" />
+        <action
+            android:id="@+id/action_mapFragment_to_segmentBottomSheet"
+            app:destination="@id/segmentBottomSheet" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/summaryFragment"
+        android:name="zaujaani.roadsensebasic.ui.summary.SummaryFragment"
+        android:label="@string/title_summary">
+        <action
+            android:id="@+id/action_summaryFragment_to_mapFragment"
+            app:destination="@id/mapFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="zaujaani.roadsensebasic.ui.settings.SettingsFragment"
+        android:label="@string/title_settings">
+        <action
+            android:id="@+id/action_settingsFragment_to_mapFragment"
+            app:destination="@id/mapFragment" />
+    </fragment>
+
+    <dialog
+        android:id="@+id/segmentBottomSheet"
+        android:name="zaujaani.roadsensebasic.ui.segment.SegmentBottomSheet"
+        android:label="@string/segment_bottom_sheet_title">
+
+        <argument
+            android:name="sessionId"
+            app:argType="long" />
+        <argument
+            android:name="startDistance"
+            app:argType="float" />
+        <argument
+            android:name="endDistance"
+            app:argType="float" />
+        <argument
+            android:name="avgVibration"
+            app:argType="float" />
+        <argument
+            android:name="conditionAuto"
+            app:argType="string" />
+        <argument
+            android:name="confidence"
+            app:argType="integer" />
+        <argument
+            android:name="tempCondition"
+            app:argType="string"
+            android:defaultValue="Baik" />
+        <argument
+            android:name="tempSurface"
+            app:argType="string"
+            android:defaultValue="Aspal" />
+    </dialog>
+
+</navigation>

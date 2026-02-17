@@ -1,0 +1,104 @@
+<resources>
+    <!-- App -->
+    <string name="app_name">RoadSense Basic</string>
+
+    <!-- Drawer Header -->
+    <string name="drawer_title">RoadSense Basic</string>
+    <string name="drawer_subtitle">Survey Kondisi Jalan</string>
+
+    <!-- Menu -->
+    <string name="menu_map">Map</string>
+    <string name="menu_summary">Summary</string>
+    <string name="menu_settings">Settings</string>
+
+    <!-- Screen Titles -->
+    <string name="title_map">Map</string>
+    <string name="title_summary">Summary</string>
+    <string name="title_settings">Settings</string>
+
+    <!-- Map screen -->
+    <string name="start_survey">Mulai Survey</string>
+    <string name="stop_survey">Hentikan Survey</string>
+    <string name="create_segment">Buat Segmen</string>
+
+    <!-- Units -->
+    <string name="unit_kmh">km/h</string>
+    <string name="unit_m">m</string>
+    <string name="unit_km">km</string>
+    <string name="unit_g">g</string>
+    <string name="gps_accuracy">Acc: %.1f m</string>
+
+    <string name="speed_format">%d km/h</string>
+    <string name="distance_m_format">%d m</string>
+    <string name="distance_km_format">%.2f km</string>
+    <string name="vibration_format">%.2f g</string>
+    <string name="accuracy_format">Acc: %.1f m</string>
+
+    <string name="confidence_value">Confidence: %d%%</string>
+
+    <string name="condition_auto">Kondisi otomatis: %s</string>
+
+    <string name="segment_bottom_sheet_title">Buat Segmen Baru</string>
+
+    <string name="permission_denied">Izin ditolak: %s</string>
+    <string name="gps_accuracy_low">Akurasi GPS rendah</string>
+    <string name="gps_accuracy_fair">Akurasi GPS cukup</string>
+    <string name="gps_accuracy_good">Akurasi GPS baik</string>
+    <string name="camera_permission_required">Izin kamera diperlukan</string>
+    <string name="take_photo">Ambil Foto</string>
+    <string name="take">Ambil</string>
+    <string name="photo_saved">Foto tersimpan</string>
+    <string name="photo_failed">Gagal mengambil foto</string>
+    <string name="microphone_permission_required">Izin mikrofon diperlukan</string>
+    <string name="recording_failed">Gagal memulai rekaman</string>
+    <string name="play_recording">Putar Rekaman</string>
+    <string name="stop">Stop</string>
+    <string name="play_failed">Gagal memutar</string>
+    <string name="road_name_required">Nama ruas harus diisi</string>
+    <string name="default_surface">Aspal</string>
+    <string name="segment_saved">Segmen berhasil disimpan</string>
+    <string name="segment_save_failed">Gagal menyimpan segmen</string>
+    <string name="jarak_prefix">Jarak: %s</string>
+    <string name="segments_prefix">Segmen: %d</string>
+    <string name="confidence_avg_prefix">Confidence rata-rata: %d%%</string>
+    <string name="device_prefix">Device: %s</string>
+
+
+    <string name="no_sessions">Belum ada sesi survey</string>
+    <string name="session_options">Pilih Tindakan</string>
+    <string name="view_details">Lihat Detail</string>
+    <string name="delete">Hapus</string>
+    <string name="export_gpx">Ekspor GPX</string>
+    <string name="delete_session">Hapus Sesi</string>
+    <string name="delete_session_confirm">Apakah Anda yakin ingin menghapus sesi ini? Semua data segmen akan ikut terhapus.</string>
+
+    <string name="export_success">Ekspor Berhasil</string>
+    <string name="export_success_message">File tersimpan di:\n%s</string>
+    <string name="export_failed">Gagal mengekspor</string>
+    <string name="distance_m">Jarak: %d m</string>
+    <string name="distance_km">Jarak: %.2f km</string>
+    <string name="segments_count">Segmen: %d</string>
+    <string name="confidence_avg">Confidence rata-rata: %d%%</string>
+    <string name="device_model">Device: %s</string>
+
+    <string name="confidence_label">Confidence:</string>
+    <string name="road_name_hint">Nama Ruas</string>
+    <string name="condition_hint">Kondisi Visual</string>
+    <string name="surface_hint">Jenis Permukaan</string>
+
+    <string name="voice_record">Rekam Catatan Suara</string>
+
+    <string name="notes_hint">Catatan (opsional)</string>
+
+    <string name="save">Simpan</string>
+    <string name="total_distance">Total_Jarak\n</string>
+    <string name="segment_count">Ruas_Ke\n</string>
+    <string name="detail_coming_soon">Detail untuk sesi %d (coming soon)</string>
+    <string name="ok">OK</string>
+
+
+
+    <string name="cancel">Batal</string>
+
+
+</resources>

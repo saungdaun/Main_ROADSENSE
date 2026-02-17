@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#888888">
+    <!-- Bar kiri -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M5,9h3v10H5z"/>
+    <!-- Bar tengah -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M10,5h3v14h-3z"/>
+    <!-- Bar kanan -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M15,12h3v7h-3z"/>
+    <!-- Garis silang (off) -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M4,4l16,16M20,4l-16,16"/>
+</vector>

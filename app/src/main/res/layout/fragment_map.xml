@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <org.osmdroid.views.MapView
+        android:id="@+id/mapView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Panel info di atas (6 item) -->
+    <LinearLayout
+        android:id="@+id/infoPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="4dp"
+        android:background="#AA000000"
+        android:layout_gravity="top"
+        android:gravity="center"
+        android:weightSum="6">
+
+        <TextView
+            android:id="@+id/tvSpeed"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="0 km/h"
+            android:textColor="#FFF"
+            android:textSize="10sp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/tvDistance"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="0 m"
+            android:textColor="#FFF"
+            android:textSize="10sp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/tvVibration"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="0.00 g"
+            android:textColor="#FFF"
+            android:textSize="10sp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/tvGpsAccuracy"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Acc:--m"
+            android:textColor="#FFF"
+            android:textSize="10sp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/tvCondition"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Baik"
+            android:textColor="#FFF"
+            android:textSize="10sp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/tvSurface"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Aspal"
+            android:textColor="#FFF"
+            android:textSize="10sp"
+            android:gravity="center" />
+    </LinearLayout>
+
+    <!-- Grafik Z-axis -->
+    <LinearLayout
+        android:id="@+id/chartContainer"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:layout_gravity="bottom"
+        android:background="#AA000000"
+        android:orientation="vertical"
+        android:padding="4dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Z-Axis (g)"
+            android:textColor="#FFF"
+            android:textSize="12sp"
+            android:layout_marginStart="8dp"/>
+
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/chartVibration"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+    </LinearLayout>
+
+    <!-- Floating Action Buttons (kanan) -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabSurvey"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:src="@drawable/ic_play"
+        android:contentDescription="Start/Stop Survey"
+        app:backgroundTint="@color/design_default_color_primary" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabSegment"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:layout_marginBottom="80dp"
+        android:src="@drawable/ic_flag"
+        android:contentDescription="Buat Segmen"
+        app:backgroundTint="@color/design_default_color_secondary"
+        android:visibility="gone" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabStop"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:layout_marginBottom="144dp"
+        android:src="@drawable/ic_stop"
+        android:visibility="gone"
+        app:backgroundTint="@color/red"
+        android:contentDescription="Stop Survey" />
+
+    <!-- Floating Action Buttons (kiri) untuk akses cepat -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabCamera"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="16dp"
+        android:layout_marginBottom="80dp"
+        android:src="@drawable/ic_camera"
+        app:backgroundTint="@color/primary"
+        app:fabSize="mini"
+        android:visibility="gone"
+        android:contentDescription="Ambil Foto" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabVoice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="16dp"
+        android:layout_marginBottom="144dp"
+        android:src="@drawable/ic_mic"
+        app:backgroundTint="@color/primary"
+        app:fabSize="mini"
+        android:visibility="gone"
+        android:contentDescription="Rekam Suara" />
+
+    <!-- Tombol Kondisi -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabCondition"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="16dp"
+        android:layout_marginBottom="208dp"
+        android:src="@drawable/ic_condition"
+        app:backgroundTint="@color/primary"
+        app:fabSize="mini"
+        android:visibility="gone"
+        android:contentDescription="Pilih Kondisi Jalan" />
+
+    <!-- Tombol Permukaan -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabSurface"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="16dp"
+        android:layout_marginBottom="272dp"
+        android:src="@drawable/ic_surface"
+        app:backgroundTint="@color/primary"
+        app:fabSize="mini"
+        android:visibility="gone"
+        android:contentDescription="Pilih Jenis Permukaan" />
+
+    <!-- Tombol toggle chart -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabToggleChart"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="16dp"
+        android:src="@drawable/ic_chart"
+        app:backgroundTint="@color/primary"
+        android:contentDescription="Toggle Chart" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
