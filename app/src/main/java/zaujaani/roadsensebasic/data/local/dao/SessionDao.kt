@@ -12,29 +12,28 @@ import zaujaani.roadsensebasic.data.repository.SessionWithCount
 interface SessionDao {
 
     @Insert
-    suspend fun insert(session: SurveySession): Long
+    suspend fun insertSession(session: SurveySession): Long
 
     @Update
-    suspend fun update(session: SurveySession)
+    suspend fun updateSession(session: SurveySession)
+
+    @Query("SELECT * FROM survey_sessions ORDER BY startTime DESC")
+    fun getAllSessions(): Flow<List<SurveySession>>
 
     @Query("SELECT * FROM survey_sessions WHERE id = :sessionId")
     suspend fun getSessionById(sessionId: Long): SurveySession?
 
-    @Query("SELECT * FROM survey_sessions ORDER BY startTime DESC")
-    fun getAllSessionsFlow(): Flow<List<SurveySession>>
-
-    @Query("SELECT * FROM survey_sessions ORDER BY startTime DESC")
-    suspend fun getAllSessionsOnce(): List<SurveySession>
-
-    @Query("DELETE FROM survey_sessions WHERE id = :sessionId")
-    suspend fun delete(sessionId: Long)
-
     @Query("""
-        SELECT s.*, COUNT(r.id) AS segmentCount 
-        FROM survey_sessions s 
-        LEFT JOIN road_segments r ON s.id = r.sessionId 
-        GROUP BY s.id 
-        ORDER BY s.startTime DESC
+        SELECT *, 
+               (SELECT COUNT(*) FROM road_events WHERE sessionId = survey_sessions.id) as eventCount 
+        FROM survey_sessions 
+        ORDER BY startTime DESC
     """)
     fun getSessionsWithCount(): Flow<List<SessionWithCount>>
+
+    @Query("DELETE FROM survey_sessions WHERE id = :sessionId")
+    suspend fun deleteSessionById(sessionId: Long)
+
+    @Query("UPDATE survey_sessions SET endTime = :endTime, totalDistance = :totalDistance, avgConfidence = :avgConfidence, endLat = :endLat, endLng = :endLng WHERE id = :sessionId")
+    suspend fun updateSessionEnd(sessionId: Long, endTime: Long, totalDistance: Double, avgConfidence: Int, endLat: Double, endLng: Double)
 }

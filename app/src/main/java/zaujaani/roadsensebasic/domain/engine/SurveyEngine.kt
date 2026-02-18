@@ -4,12 +4,15 @@ import android.location.Location
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import zaujaani.roadsensebasic.data.local.entity.Condition
-import zaujaani.roadsensebasic.data.local.entity.RoadSegment
+import zaujaani.roadsensebasic.data.local.entity.EventType
+import zaujaani.roadsensebasic.data.local.entity.RoadEvent
 import zaujaani.roadsensebasic.data.local.entity.Surface
 import zaujaani.roadsensebasic.data.local.entity.SurveySession
 import zaujaani.roadsensebasic.data.local.entity.TelemetryRaw
@@ -23,8 +26,8 @@ import javax.inject.Singleton
 
 /**
  * Engine utama survey jalan.
- * Mengelola state survey, telemetri GPS, analisis getaran, dan segmen ruas.
- * Singleton sehingga state tetap ada saat fragment berganti.
+ * Mengelola state survey, telemetri, dan pencatatan event.
+ * Singleton agar state tetap ada saat fragment berganti.
  */
 @Singleton
 class SurveyEngine @Inject constructor(
@@ -34,22 +37,21 @@ class SurveyEngine @Inject constructor(
     private val vibrationAnalyzer: VibrationAnalyzer,
     private val confidenceCalculator: ConfidenceCalculator
 ) {
-    // Scope terpisah agar tidak tergantung lifecycle fragment
+    // Scope terpisah agar tidak tergantung lifecycle
     private val engineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private var currentSessionId: Long? = null
     private var isActive = false
-    private var isPaused = false
     private var currentDistanceValue = 0.0
     private var lastLocation: Location? = null
     private val telemetryBuffer = mutableListOf<TelemetryRaw>()
     private var lastSaveTime = System.currentTimeMillis()
 
-    // State sementara untuk label kondisi dan permukaan (diperbarui oleh UI)
-    private var currentTempCondition: Condition = Condition.BAIK
-    private var currentTempSurface: Surface = Surface.ASPAL
+    // State nilai terkini untuk kondisi dan permukaan (akan digunakan untuk telemetri)
+    private var currentCondition: Condition = Condition.BAIK
+    private var currentSurface: Surface = Surface.ASPAL
 
-    // StateFlows yang bisa diobservasi dari ViewModel manapun
+    // StateFlows yang bisa diobservasi
     private val _currentDistance = MutableStateFlow(0.0)
     val currentDistance: StateFlow<Double> = _currentDistance.asStateFlow()
 
@@ -57,43 +59,27 @@ class SurveyEngine @Inject constructor(
     val isSurveying: StateFlow<Boolean> = _isSurveying.asStateFlow()
 
     private val _isPaused = MutableStateFlow(false)
-    val isPausedFlow: StateFlow<Boolean> = _isPaused.asStateFlow()
+    val isPaused: StateFlow<Boolean> = _isPaused.asStateFlow()
 
-    // State segmen aktif
-    private var segmentStartDistance = 0.0
-    private var segmentStartLocation: Location? = null
-    private val segmentVibrationBuffer = mutableListOf<Float>()
-    private var segmentStartTime = 0L
-    private var isSegmentStarted = false
-
-    private val _isSegmentActive = MutableStateFlow(false)
-    val isSegmentActive: StateFlow<Boolean> = _isSegmentActive.asStateFlow()
-
-    // Vibration realtime StateFlow
+    // Vibration realtime
     private val _currentVibration = MutableStateFlow(0f)
     val currentVibration: StateFlow<Float> = _currentVibration.asStateFlow()
 
-    // Riwayat vibration untuk chart (hanya saat survey aktif)
+    // Riwayat vibration untuk chart (hanya Z)
     private val _vibrationHistory = MutableStateFlow<List<Float>>(emptyList())
     val vibrationHistory: StateFlow<List<Float>> = _vibrationHistory.asStateFlow()
 
+    // Trigger jarak (misal setiap 100m) untuk notifikasi
+    private val _distanceTrigger = MutableSharedFlow<Double>(extraBufferCapacity = 5)
+    val distanceTrigger = _distanceTrigger.asSharedFlow()
+
     // ========== STATE ACCESSORS ==========
 
-    fun isSurveying(): Boolean = isActive
-    fun isPausedState(): Boolean = isPaused
     fun getCurrentSessionId(): Long? = currentSessionId
     fun getCurrentDistance(): Double = currentDistanceValue
-    fun getSegmentStartDistance(): Double = segmentStartDistance
-    fun isSegmentStarted(): Boolean = isSegmentStarted
-
-    // ========== LABEL MANAGEMENT (dipanggil dari UI) ==========
-    fun setTempCondition(condition: Condition) {
-        currentTempCondition = condition
-    }
-
-    fun setTempSurface(surface: Surface) {
-        currentTempSurface = surface
-    }
+    fun getLastLocation(): Location? = lastLocation
+    fun getCurrentCondition(): Condition = currentCondition
+    fun getCurrentSurface(): Surface = currentSurface
 
     // ========== SESSION MANAGEMENT ==========
 
@@ -107,18 +93,16 @@ class SurveyEngine @Inject constructor(
             startLat = firstLoc?.latitude ?: 0.0,
             startLng = firstLoc?.longitude ?: 0.0
         )
-        val id = surveyRepository.createSession(session)
+        val id = surveyRepository.insertSession(session)
         currentSessionId = id
         isActive = true
-        isPaused = false
+        _isPaused.value = false
         currentDistanceValue = 0.0
         _currentDistance.value = 0.0
         _isSurveying.value = true
-        _isPaused.value = false
         _vibrationHistory.value = emptyList()
         lastLocation = null
         telemetryBuffer.clear()
-        resetSegment()
         return id
     }
 
@@ -134,12 +118,11 @@ class SurveyEngine @Inject constructor(
                 totalDistance = currentDistanceValue,
                 endLat = lastLoc?.latitude ?: session.startLat,
                 endLng = lastLoc?.longitude ?: session.startLng,
-                avgConfidence = calculateAvgConfidence(sessionId)
+                avgConfidence = 0 // dapat dihitung nanti jika diperlukan
             )
             surveyRepository.updateSession(updatedSession)
         }
         isActive = false
-        isPaused = false
         _isSurveying.value = false
         _isPaused.value = false
         currentSessionId = null
@@ -147,7 +130,6 @@ class SurveyEngine @Inject constructor(
 
     fun discardCurrentSession() {
         isActive = false
-        isPaused = false
         currentSessionId = null
         currentDistanceValue = 0.0
         _currentDistance.value = 0.0
@@ -156,30 +138,22 @@ class SurveyEngine @Inject constructor(
         lastLocation = null
         telemetryBuffer.clear()
         _vibrationHistory.value = emptyList()
-        resetSegment()
     }
 
     fun pauseSurvey() {
         if (!isActive) return
-        isPaused = true
         _isPaused.value = true
     }
 
     fun resumeSurvey() {
         if (!isActive) return
-        isPaused = false
         _isPaused.value = false
-    }
-
-    private suspend fun calculateAvgConfidence(sessionId: Long): Int {
-        val segments = surveyRepository.getSegmentsForSessionOnce(sessionId)
-        return if (segments.isNotEmpty()) segments.map { it.confidence }.average().toInt() else 0
     }
 
     // ========== LOCATION UPDATE ==========
 
     fun updateLocation(location: Location) {
-        if (!isActive || isPaused) return
+        if (!isActive || _isPaused.value) return
 
         lastLocation?.let { last ->
             val results = FloatArray(1)
@@ -188,25 +162,37 @@ class SurveyEngine @Inject constructor(
                 location.latitude, location.longitude,
                 results
             )
-            // Filter noise: hanya update jika bergerak > 1m dan akurasi < 25m
-            if (results[0] > 0.5f && location.accuracy < 25f) {
+            // Filter noise: hanya update jika bergerak > 0.5m dan akurasi < 25m
+            if (results[0] > 0.5f && location.accuracy < Constants.GPS_ACCURACY_THRESHOLD) {
+                val previousDistance = currentDistanceValue
                 currentDistanceValue += results[0]
                 _currentDistance.value = currentDistanceValue
+
+                // Trigger setiap kelipatan 100m
+                val previous100 = (previousDistance / 100).toInt()
+                val current100 = (currentDistanceValue / 100).toInt()
+                if (current100 > previous100) {
+                    engineScope.launch {
+                        _distanceTrigger.emit(currentDistanceValue)
+                    }
+                }
             }
         }
         lastLocation = location
 
-        // Ambil nilai terkini dari sensor (Z sudah smoothed RMS, X dan Y raw)
+        // Ambil nilai getaran dari gateway
         val vibrationZ = sensorGateway.getLatestVibration()
         val vibrationX = sensorGateway.axisX.value
         val vibrationY = sensorGateway.axisY.value
 
         _currentVibration.value = vibrationZ
 
-        // Update chart history hanya dengan Z (untuk tampilan sederhana)
+        // Update chart history
         val currentList = _vibrationHistory.value.toMutableList()
         currentList.add(vibrationZ)
-        if (currentList.size > 150) currentList.removeAt(0)
+        if (currentList.size > Constants.VIBRATION_HISTORY_MAX) {
+            currentList.removeAt(0)
+        }
         _vibrationHistory.value = currentList
 
         // Buat telemetri dengan data lengkap
@@ -222,21 +208,15 @@ class SurveyEngine @Inject constructor(
             vibrationZ = vibrationZ,
             gpsAccuracy = location.accuracy,
             cumulativeDistance = currentDistanceValue,
-            condition = currentTempCondition,
-            surface = currentTempSurface
+            condition = currentCondition,      // enum Condition
+            surface = currentSurface           // enum Surface
         )
         telemetryBuffer.add(telemetry)
 
         val now = System.currentTimeMillis()
-        if (telemetryBuffer.size >= 10 || now - lastSaveTime > 2000) {
+        if (telemetryBuffer.size >= Constants.TELEMETRY_BUFFER_SIZE || now - lastSaveTime > Constants.TELEMETRY_FLUSH_INTERVAL) {
             flushTelemetry()
             lastSaveTime = now
-        }
-
-        if (isSegmentStarted) {
-            synchronized(segmentVibrationBuffer) {
-                segmentVibrationBuffer.add(vibrationZ)
-            }
         }
     }
 
@@ -247,8 +227,8 @@ class SurveyEngine @Inject constructor(
         engineScope.launch {
             try {
                 telemetryRepository.insertAll(snapshot)
-            } catch (e: Exception) {
-                // Re-add ke buffer jika gagal
+            } catch (_: Exception) {
+                // Kembalikan ke buffer jika gagal (sederhana)
                 telemetryBuffer.addAll(0, snapshot)
             }
         }
@@ -260,129 +240,104 @@ class SurveyEngine @Inject constructor(
         telemetryBuffer.clear()
         try {
             telemetryRepository.insertAll(snapshot)
-        } catch (e: Exception) {
-            // Diabaikan saat stop session
+        } catch (_: Exception) {
+            // Diabaikan saat stop
         }
     }
 
-    // ========== SEGMENT MANAGEMENT ==========
+    // ========== EVENT RECORDING ==========
 
-    fun startSegment() {
-        if (!isActive || isPaused) return
-        synchronized(segmentVibrationBuffer) {
-            segmentStartDistance = currentDistanceValue
-            segmentStartLocation = lastLocation
-            segmentVibrationBuffer.clear()
-            segmentStartTime = System.currentTimeMillis()
-            isSegmentStarted = true
-            _isSegmentActive.value = true
+    fun recordConditionChange(condition: Condition) {
+        currentCondition = condition
+        val location = lastLocation ?: return
+        val sessionId = currentSessionId ?: return
+        val event = RoadEvent(
+            sessionId = sessionId,
+            timestamp = System.currentTimeMillis(),
+            latitude = location.latitude,
+            longitude = location.longitude,
+            distance = currentDistanceValue.toFloat(),
+            eventType = EventType.CONDITION_CHANGE,
+            value = condition.name,
+            notes = null
+        )
+        engineScope.launch {
+            surveyRepository.insertEvent(event)
         }
     }
 
-    suspend fun endSegment(
-        name: String,
-        manualCondition: String?,
-        surfaceType: String,
-        notes: String,
-        photoPath: String,
-        audioPath: String
-    ): RoadSegment? {
-        if (!isSegmentStarted) return null
-
-        val endDist = currentDistanceValue
-        val endLocation = lastLocation
-        val startLocation = segmentStartLocation
-
-        // Buat salinan buffer untuk diproses
-        val bufferCopy = synchronized(segmentVibrationBuffer) { segmentVibrationBuffer.toList() }
-
-        val avgVibration = if (bufferCopy.isNotEmpty()) {
-            vibrationAnalyzer.analyzeVibration(bufferCopy)
-        } else 0.0
-
-        val gpsAvailability = lastLocation != null
-        val gpsAccuracy = lastLocation?.accuracy ?: 20f
-        val vibrationConsistency = vibrationAnalyzer.calculateConsistency(bufferCopy)
-        val speed = lastLocation?.speed ?: 0f
-        val confidence = confidenceCalculator.calculateConfidence(
-            gpsAvailability = gpsAvailability,
-            gpsAccuracy = gpsAccuracy,
-            vibrationConsistency = vibrationConsistency,
-            speed = speed
+    fun recordSurfaceChange(surface: Surface) {
+        currentSurface = surface
+        val location = lastLocation ?: return
+        val sessionId = currentSessionId ?: return
+        val event = RoadEvent(
+            sessionId = sessionId,
+            timestamp = System.currentTimeMillis(),
+            latitude = location.latitude,
+            longitude = location.longitude,
+            distance = currentDistanceValue.toFloat(),
+            eventType = EventType.SURFACE_CHANGE,
+            value = surface.name,
+            notes = null
         )
-
-        val conditionAuto = classifyCondition(avgVibration)
-        val finalCondition = manualCondition?.takeIf { it.isNotBlank() } ?: conditionAuto
-
-        val segment = RoadSegment(
-            sessionId = currentSessionId ?: return null,
-            startDistance = segmentStartDistance,
-            endDistance = endDist,
-            avgVibration = avgVibration,
-            conditionAuto = finalCondition,
-            confidence = confidence,
-            name = name,
-            surfaceType = surfaceType,
-            notes = notes,
-            photoPath = photoPath,
-            audioPath = audioPath,
-            startLat = startLocation?.latitude ?: 0.0,
-            startLng = startLocation?.longitude ?: 0.0,
-            endLat = endLocation?.latitude ?: 0.0,
-            endLng = endLocation?.longitude ?: 0.0,
-            createdAt = System.currentTimeMillis()
-        )
-
-        surveyRepository.insertSegment(segment)
-        resetSegment()
-        return segment
-    }
-
-    fun cancelSegment() {
-        resetSegment()
-    }
-
-    private fun resetSegment() {
-        synchronized(segmentVibrationBuffer) {
-            isSegmentStarted = false
-            segmentVibrationBuffer.clear()
-            segmentStartDistance = 0.0
-            segmentStartLocation = null
-            _isSegmentActive.value = false
+        engineScope.launch {
+            surveyRepository.insertEvent(event)
         }
     }
 
-    // ========== REALTIME ASSESSMENT ==========
-
-    fun getCurrentAvgVibration(): Double {
-        val bufferCopy = synchronized(segmentVibrationBuffer) { segmentVibrationBuffer.toList() }
-        return if (bufferCopy.isNotEmpty()) {
-            vibrationAnalyzer.analyzeVibration(bufferCopy)
-        } else 0.0
-    }
-
-    fun getCurrentConditionAuto(): String = classifyCondition(getCurrentAvgVibration())
-
-    private fun classifyCondition(avgVibration: Double): String = when {
-        avgVibration < Constants.DEFAULT_THRESHOLD_BAIK -> Constants.CONDITION_BAIK
-        avgVibration < Constants.DEFAULT_THRESHOLD_SEDANG -> Constants.CONDITION_SEDANG
-        avgVibration < Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN -> Constants.CONDITION_RUSAK_RINGAN
-        else -> Constants.CONDITION_RUSAK_BERAT
-    }
-
-    fun getCurrentConfidence(): Int {
-        val bufferCopy = synchronized(segmentVibrationBuffer) { segmentVibrationBuffer.toList() }
-        val gpsAvailability = lastLocation != null
-        val gpsAccuracy = lastLocation?.accuracy ?: 20f
-        val vibrationConsistency = vibrationAnalyzer.calculateConsistency(bufferCopy)
-        val speed = lastLocation?.speed ?: 0f
-        return confidenceCalculator.calculateConfidence(
-            gpsAvailability = gpsAvailability,
-            gpsAccuracy = gpsAccuracy,
-            vibrationConsistency = vibrationConsistency,
-            speed = speed
+    fun recordPhoto(path: String, notes: String? = null) {
+        val location = lastLocation ?: return
+        val sessionId = currentSessionId ?: return
+        val event = RoadEvent(
+            sessionId = sessionId,
+            timestamp = System.currentTimeMillis(),
+            latitude = location.latitude,
+            longitude = location.longitude,
+            distance = currentDistanceValue.toFloat(),
+            eventType = EventType.PHOTO,
+            value = path,
+            notes = notes
         )
+        engineScope.launch {
+            surveyRepository.insertEvent(event)
+        }
     }
 
-    fun getLastLocation(): Location? = lastLocation
+    fun recordVoice(path: String, notes: String? = null) {
+        val location = lastLocation ?: return
+        val sessionId = currentSessionId ?: return
+        val event = RoadEvent(
+            sessionId = sessionId,
+            timestamp = System.currentTimeMillis(),
+            latitude = location.latitude,
+            longitude = location.longitude,
+            distance = currentDistanceValue.toFloat(),
+            eventType = EventType.VOICE,
+            value = path,
+            notes = notes
+        )
+        engineScope.launch {
+            surveyRepository.insertEvent(event)
+        }
+    }
+
+    // ========== UTILITY ==========
+
+    fun checkConditionConsistency(selectedCondition: Condition): Boolean {
+        // Bandingkan dengan getaran terkini, return true jika konsisten, false jika bertolak belakang
+        val vib = _currentVibration.value
+        return when (selectedCondition) {
+            Condition.BAIK -> vib < Constants.DEFAULT_THRESHOLD_BAIK * 1.2
+            Condition.SEDANG -> vib in (Constants.DEFAULT_THRESHOLD_BAIK * 0.8)..(Constants.DEFAULT_THRESHOLD_SEDANG * 1.2)
+            Condition.RUSAK_RINGAN -> vib in (Constants.DEFAULT_THRESHOLD_SEDANG * 0.8)..(Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN * 1.2)
+            Condition.RUSAK_BERAT -> vib > Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN * 0.8
+        }
+    }
+
+    private fun classifyCondition(avgVibration: Double): Condition = when {
+        avgVibration < Constants.DEFAULT_THRESHOLD_BAIK -> Condition.BAIK
+        avgVibration < Constants.DEFAULT_THRESHOLD_SEDANG -> Condition.SEDANG
+        avgVibration < Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN -> Condition.RUSAK_RINGAN
+        else -> Condition.RUSAK_BERAT
+    }
 }

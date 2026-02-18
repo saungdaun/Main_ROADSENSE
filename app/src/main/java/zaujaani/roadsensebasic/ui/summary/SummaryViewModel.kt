@@ -9,7 +9,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import zaujaani.roadsensebasic.data.local.entity.RoadSegment
+import zaujaani.roadsensebasic.data.local.entity.EventType
+import zaujaani.roadsensebasic.data.local.entity.RoadEvent
 import zaujaani.roadsensebasic.data.local.entity.SurveySession
 import zaujaani.roadsensebasic.data.repository.SessionWithCount
 import zaujaani.roadsensebasic.data.repository.SurveyRepository
@@ -19,12 +20,9 @@ import java.io.File
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
-/**
- * UI Model untuk menampilkan detail lengkap sesi.
- */
 data class SessionDetailUi(
     val session: SurveySession,
-    val segments: List<RoadSegment>,
+    val events: List<RoadEvent>,
     val totalDistance: Double,
     val durationMinutes: Int,
     val avgConfidence: Int,
@@ -41,15 +39,12 @@ class SummaryViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    // Daftar sesi ringkas
     private val _sessions = MutableLiveData<List<SessionWithCount>>()
     val sessions: LiveData<List<SessionWithCount>> = _sessions
 
-    // Detail sesi (untuk dialog)
     private val _sessionDetail = MutableLiveData<SessionDetailUi?>()
     val sessionDetail: LiveData<SessionDetailUi?> = _sessionDetail
 
-    // Status loading
     private val _isLoading = MutableLiveData(false)
     val isLoading: LiveData<Boolean> = _isLoading
 
@@ -57,9 +52,6 @@ class SummaryViewModel @Inject constructor(
         loadSessions()
     }
 
-    /**
-     * Memuat daftar semua sesi beserta jumlah segmennya.
-     */
     fun loadSessions() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -77,50 +69,61 @@ class SummaryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Memuat detail lengkap sesi berdasarkan ID.
-     */
     fun loadSessionDetail(sessionId: Long) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
                 val session = surveyRepository.getSessionById(sessionId)
                 if (session == null) {
-                    Timber.w("Session with id $sessionId not found")
+                    Timber.w("Session $sessionId not found")
                     _sessionDetail.value = null
                     return@launch
                 }
 
-                val segments = surveyRepository.getSegmentsForSessionOnce(sessionId)
+                val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
+                val events = surveyRepository.getEventsForSession(sessionId)
 
                 val totalDistance = session.totalDistance
                 val durationMinutes = ((session.endTime ?: session.startTime) - session.startTime) / 60000
-                val avgConfidence = if (segments.isNotEmpty()) {
-                    (segments.map { it.confidence }.average()).roundToInt()
-                } else 0
+                val avgConfidence = 0 // Bisa dihitung nanti jika diperlukan
 
-                val photoCount = segments.count { !it.photoPath.isNullOrBlank() }
-                val audioCount = segments.count { !it.audioPath.isNullOrBlank() }
+                val photoCount = events.count { it.eventType == EventType.PHOTO }
+                val audioCount = events.count { it.eventType == EventType.VOICE }
 
-                val conditionDistribution = segments.groupBy { it.conditionAuto }
-                    .mapValues { (_, segs) -> segs.sumOf { it.endDistance - it.startDistance } }
+                val conditionMap = mutableMapOf<String, Double>()
+                val surfaceMap = mutableMapOf<String, Double>()
 
-                val surfaceDistribution = segments.groupBy { it.surfaceType }
-                    .mapValues { (_, segs) -> segs.sumOf { it.endDistance - it.startDistance } }
+                if (telemetries.size >= 2) {
+                    var lastDist = telemetries.first().cumulativeDistance
+                    var lastCondition = telemetries.first().condition.name
+                    var lastSurface = telemetries.first().surface.name
+
+                    for (i in 1 until telemetries.size) {
+                        val t = telemetries[i]
+                        val delta = t.cumulativeDistance - lastDist
+                        if (delta > 0) {
+                            conditionMap[lastCondition] = conditionMap.getOrDefault(lastCondition, 0.0) + delta
+                            surfaceMap[lastSurface] = surfaceMap.getOrDefault(lastSurface, 0.0) + delta
+                        }
+                        lastDist = t.cumulativeDistance
+                        lastCondition = t.condition.name
+                        lastSurface = t.surface.name
+                    }
+                }
 
                 val detail = SessionDetailUi(
                     session = session,
-                    segments = segments,
+                    events = events,
                     totalDistance = totalDistance,
                     durationMinutes = durationMinutes.toInt(),
                     avgConfidence = avgConfidence,
                     photoCount = photoCount,
                     audioCount = audioCount,
-                    conditionDistribution = conditionDistribution,
-                    surfaceDistribution = surfaceDistribution
+                    conditionDistribution = conditionMap,
+                    surfaceDistribution = surfaceMap
                 )
                 _sessionDetail.value = detail
-                Timber.d("Loaded detail for session $sessionId with ${segments.size} segments")
+                Timber.d("Loaded detail for session $sessionId with ${telemetries.size} telemetry points")
             } catch (e: Exception) {
                 Timber.e(e, "Gagal memuat detail sesi $sessionId")
                 _sessionDetail.value = null
@@ -130,16 +133,12 @@ class SummaryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Menghapus sesi beserta semua segmen dan telemetri terkait.
-     */
     fun deleteSession(session: SurveySession) {
         viewModelScope.launch {
             try {
                 telemetryRepository.deleteBySession(session.id)
                 surveyRepository.deleteSessionById(session.id)
                 Timber.d("Deleted session ${session.id}")
-                // Refresh daftar sesi
                 loadSessions()
             } catch (e: Exception) {
                 Timber.e(e, "Gagal menghapus sesi ${session.id}")
@@ -147,61 +146,43 @@ class SummaryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Ekspor sesi ke format GPX (callback untuk fragment).
-     */
     fun exportSessionToGpx(sessionId: Long, callback: (File?) -> Unit) {
         viewModelScope.launch {
             try {
-                val session = surveyRepository.getSessionById(sessionId)
-                if (session == null) {
-                    Timber.w("Session $sessionId not found for GPX export")
-                    callback(null)
-                    return@launch
-                }
+                val session = surveyRepository.getSessionById(sessionId) ?: return@launch callback(null)
                 val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
-                if (telemetries.isEmpty()) {
-                    Timber.w("No telemetry data for session $sessionId, cannot export GPX")
-                    callback(null)
-                    return@launch
-                }
-                val segments = surveyRepository.getSegmentsForSessionOnce(sessionId)
+                if (telemetries.isEmpty()) return@launch callback(null)
+                val events = surveyRepository.getEventsForSession(sessionId)
                 val file = FileExporter.exportToGpx(
-                    context,
-                    "RoadSense_${session.startTime}",
-                    telemetries,
-                    segments
+                    context = context,
+                    sessionName = "RoadSense_${session.startTime}",
+                    telemetries = telemetries,
+                    events = events
                 )
                 callback(file)
             } catch (e: Exception) {
-                Timber.e(e, "Error exporting session $sessionId to GPX")
+                Timber.e(e, "GPX export error")
                 callback(null)
             }
         }
     }
 
-    /**
-     * Ekspor sesi ke format CSV (callback untuk fragment).
-     */
     fun exportSessionToCsv(sessionId: Long, callback: (File?) -> Unit) {
         viewModelScope.launch {
             try {
-                val session = surveyRepository.getSessionById(sessionId)
-                if (session == null) {
-                    Timber.w("Session $sessionId not found for CSV export")
-                    callback(null)
-                    return@launch
-                }
-                val segments = surveyRepository.getSegmentsForSessionOnce(sessionId)
+                val session = surveyRepository.getSessionById(sessionId) ?: return@launch callback(null)
+                val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
+                val events = surveyRepository.getEventsForSession(sessionId)
                 val file = FileExporter.exportToCsv(
-                    context,
-                    "RoadSense_${session.startTime}",
-                    session,
-                    segments
+                    context = context,
+                    sessionName = "RoadSense_${session.startTime}",
+                    session = session,
+                    telemetries = telemetries,
+                    events = events
                 )
                 callback(file)
             } catch (e: Exception) {
-                Timber.e(e, "Error exporting session $sessionId to CSV")
+                Timber.e(e, "CSV export error")
                 callback(null)
             }
         }

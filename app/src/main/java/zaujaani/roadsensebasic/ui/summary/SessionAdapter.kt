@@ -12,9 +12,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Adapter untuk daftar sesi survey dengan DiffUtil untuk update efisien.
- */
 class SessionAdapter(
     private val onItemClick: (SessionWithCount) -> Unit,
     private val onDetailClick: (SessionWithCount) -> Unit
@@ -32,12 +29,8 @@ class SessionAdapter(
         }
     }
 
-    // Tidak perlu mendefinisikan ulang submitList, gunakan dari ListAdapter
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SessionViewHolder {
-        val binding = ItemSessionBinding.inflate(
-            LayoutInflater.from(parent.context), parent, false
-        )
+        val binding = ItemSessionBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return SessionViewHolder(binding, onItemClick, onDetailClick)
     }
 
@@ -70,16 +63,16 @@ class SessionAdapter(
                 ctx.getString(R.string.distance_km_format, session.totalDistance / 1000.0)
             }
 
-            // Jumlah segmen
-            binding.tvSegmentCount.text = item.segmentCount.toString()
+            // Jumlah event (dulu segmentCount)
+            binding.tvSegmentCount.text = item.eventCount.toString()
 
-            // Nama surveyor + jalan (jika ada)
-            if (session.roadName.isNotBlank() || session.surveyorName.isNotBlank()) {
-                val info = buildString {
-                    if (session.roadName.isNotBlank()) append("🛣 ${session.roadName}")
-                    if (session.roadName.isNotBlank() && session.surveyorName.isNotBlank()) append("  ")
-                    if (session.surveyorName.isNotBlank()) append("👤 ${session.surveyorName}")
-                }
+            // Nama surveyor + jalan (tampilkan di tvDevice jika ada)
+            val info = buildString {
+                if (session.roadName.isNotBlank()) append("🛣 ${session.roadName}")
+                if (session.roadName.isNotBlank() && session.surveyorName.isNotBlank()) append("  ")
+                if (session.surveyorName.isNotBlank()) append("👤 ${session.surveyorName}")
+            }
+            if (info.isNotBlank()) {
                 binding.tvDevice.text = info
             }
 

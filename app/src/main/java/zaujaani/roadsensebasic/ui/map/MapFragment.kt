@@ -21,6 +21,7 @@ import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
@@ -37,7 +38,8 @@ import org.osmdroid.views.overlay.Polyline
 import timber.log.Timber
 import zaujaani.roadsensebasic.BuildConfig
 import zaujaani.roadsensebasic.R
-import zaujaani.roadsensebasic.data.local.entity.RoadSegment
+import zaujaani.roadsensebasic.data.local.entity.Condition
+import zaujaani.roadsensebasic.data.local.entity.Surface
 import zaujaani.roadsensebasic.databinding.FragmentMapBinding
 import zaujaani.roadsensebasic.gateway.SensorGateway
 import zaujaani.roadsensebasic.util.Constants
@@ -58,34 +60,27 @@ class MapFragment : Fragment() {
     private lateinit var mapView: MapView
     private lateinit var chart: LineChart
     private lateinit var fabSurvey: FloatingActionButton
-    private lateinit var fabSegment: FloatingActionButton
     private lateinit var fabStop: FloatingActionButton
     private lateinit var fabToggleChart: FloatingActionButton
     private lateinit var fabCamera: FloatingActionButton
     private lateinit var fabVoice: FloatingActionButton
     private lateinit var fabCondition: FloatingActionButton
     private lateinit var fabSurface: FloatingActionButton
+    private lateinit var fabToggleOrientation: FloatingActionButton
 
-    // Peta
     private val pathPoints = mutableListOf<GeoPoint>()
     private var currentPolyline = Polyline()
-    private val segmentMarkers = mutableListOf<Marker>()
     private var myLocationMarker: Marker? = null
     private var accuracyCircle: Polygon? = null
 
-    // Untuk smooth follow camera
     private var lastCameraPoint: GeoPoint? = null
-
-    // Smooth zoom
     private var lastZoomLevel: Double = 18.0
-
-    // Smooth bearing
     private var lastBearing = 0f
 
     private var isChartVisible = true
     private var isFollowingGPS = true
+    private var isOrientationEnabled = true
 
-    // Warna kondisi
     private val colorBaik by lazy { ContextCompat.getColor(requireContext(), R.color.green) }
     private val colorSedang by lazy { ContextCompat.getColor(requireContext(), R.color.yellow) }
     private val colorRusakRingan by lazy { ContextCompat.getColor(requireContext(), R.color.orange) }
@@ -117,37 +112,22 @@ class MapFragment : Fragment() {
         setupChart()
         setupClickListeners()
         observeViewModel()
+        observeDistanceTrigger()
         restoreSurveyState()
-
-        // Listener untuk notifikasi segmen tersimpan - dinonaktifkan sementara karena memerlukan fungsi di ViewModel
-        // Jika ingin diaktifkan, tambahkan fungsi getSegmentsForSession di ViewModel
-        /*
-        parentFragmentManager.setFragmentResultListener("segment_saved", viewLifecycleOwner) { _, bundle ->
-            val sessionId = bundle.getLong("session_id", -1)
-            if (sessionId > 0) {
-                // Implementasi jika ViewModel memiliki fungsi getSegmentsForSession
-                // viewModel.getSegmentsForSession(sessionId).observe(viewLifecycleOwner) { segments: List<RoadSegment>? ->
-                //     segments?.forEach { segment -> addSegmentMarker(segment) }
-                // }
-            }
-        }
-        */
     }
 
     private fun bindViews() {
         mapView = binding.mapView
         chart = binding.chartVibration
         fabSurvey = binding.fabSurvey
-        fabSegment = binding.fabSegment
         fabStop = binding.fabStop
         fabToggleChart = binding.fabToggleChart
         fabCamera = binding.fabCamera
         fabVoice = binding.fabVoice
         fabCondition = binding.fabCondition
         fabSurface = binding.fabSurface
+        fabToggleOrientation = binding.fabToggleOrientation
     }
-
-    // ========== PETA ==========
 
     private fun setupMap() {
         mapView.apply {
@@ -178,59 +158,9 @@ class MapFragment : Fragment() {
         mapView.invalidate()
     }
 
-    /**
-     * Menambahkan marker untuk segmen (start dan end). Dipanggil saat segmen selesai dibuat.
-     */
-    private fun addSegmentMarker(segment: RoadSegment) {
-        // Validasi koordinat start
-        if (segment.startLat == 0.0 && segment.startLng == 0.0) {
-            Timber.w("addSegmentMarker: startLat/Lng 0, skip")
-            return
-        }
-
-        // Marker START
-        val startMarker = Marker(mapView).apply {
-            position = GeoPoint(segment.startLat, segment.startLng)
-            title = getString(R.string.segment_start_title, segment.name)
-            snippet = getString(
-                R.string.segment_marker_snippet,
-                segment.conditionAuto,
-                segment.surfaceType,
-                (segment.endDistance - segment.startDistance).toInt()
-            )
-            icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_marker_start)
-            isFlat = true
-        }
-
-        // Marker END (fallback ke start jika koordinat end tidak valid)
-        val endMarker = Marker(mapView).apply {
-            position = GeoPoint(
-                segment.endLat.takeIf { it != 0.0 } ?: segment.startLat,
-                segment.endLng.takeIf { it != 0.0 } ?: segment.startLng
-            )
-            title = getString(R.string.segment_end_title, segment.name)
-            snippet = getString(R.string.segment_condition_label, segment.conditionAuto)
-            icon = getConditionMarkerIcon(segment.conditionAuto)
-            isFlat = true
-        }
-
-        // Simpan referensi marker
-        segmentMarkers.add(startMarker)
-        segmentMarkers.add(endMarker)
-
-        // Tambahkan ke overlay
-        mapView.overlays.add(startMarker)
-        mapView.overlays.add(endMarker)
-
-        mapView.invalidate()
-        Timber.d("addSegmentMarker: added start and end markers for segment ${segment.name}")
-    }
-
-    // ===== MARKER LOKASI + LINGKARAN AKURASI (PRO) =====
     private fun updateMyLocationUI(location: Location) {
         val geoPoint = GeoPoint(location.latitude, location.longitude)
 
-        // 1. Marker lokasi saya
         if (myLocationMarker == null) {
             myLocationMarker = Marker(mapView).apply {
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -244,48 +174,36 @@ class MapFragment : Fragment() {
             rotation = location.bearing
         }
 
-        // 2. Hapus lingkaran lama jika ada
         accuracyCircle?.let { mapView.overlays.remove(it) }
 
-        // 3. Buat lingkaran baru dengan modifikasi Paint yang sudah ada (bukan reassign)
         accuracyCircle = Polygon().apply {
             points = Polygon.pointsAsCircle(geoPoint, location.accuracy.toDouble())
-
-            // Fill paint - gunakan properti yang sudah ada, jangan buat Paint baru
             fillPaint.apply {
                 style = android.graphics.Paint.Style.FILL
-                color = 0x332196F3.toInt()  // biru transparan 20%
+                color = 0x332196F3.toInt()
                 isAntiAlias = true
             }
-
-            // Outline paint - modifikasi properti yang sudah ada
             outlinePaint.apply {
                 style = android.graphics.Paint.Style.STROKE
-                color = 0x882196F3.toInt()  // biru lebih gelap 53%
+                color = 0x882196F3.toInt()
                 strokeWidth = 2f
                 isAntiAlias = true
             }
         }
 
-        // 4. Tambahkan lingkaran ke map
         accuracyCircle?.let { mapView.overlays.add(it) }
 
-        // 5. Pastikan marker lokasi berada di atas lingkaran
         myLocationMarker?.let { marker ->
             mapView.overlays.remove(marker)
             mapView.overlays.add(marker)
         }
 
-        // 6. Zoom dan navigasi
         adjustZoomBasedOnAccuracy(location.accuracy)
         updateNavigationMode(location)
 
         mapView.invalidate()
     }
 
-    /**
-     * Smooth follow camera dengan interpolasi adaptif berdasarkan kecepatan
-     */
     private fun smoothFollow(location: Location) {
         val geoPoint = GeoPoint(location.latitude, location.longitude)
 
@@ -295,11 +213,10 @@ class MapFragment : Fragment() {
             return
         }
 
-        // Faktor interpolasi berdasarkan kecepatan (m/s)
         val factor = when {
-            location.speed < 3f -> 0.1   // jalan kaki / pelan
-            location.speed < 10f -> 0.2  // motor / sedang
-            else -> 0.3                   // mobil / cepat
+            location.speed < 3f -> 0.1
+            location.speed < 10f -> 0.2
+            else -> 0.3
         }
 
         val lat = lastCameraPoint!!.latitude +
@@ -312,9 +229,6 @@ class MapFragment : Fragment() {
         lastCameraPoint = smoothPoint
     }
 
-    /**
-     * Menyesuaikan zoom berdasarkan akurasi GPS, dengan ambang batas untuk menghindari lompatan
-     */
     private fun adjustZoomBasedOnAccuracy(accuracy: Float) {
         val targetZoom = when {
             accuracy < 5 -> 19.5
@@ -324,48 +238,26 @@ class MapFragment : Fragment() {
             else -> 15.5
         }
 
-        // Hanya ubah zoom jika perbedaan cukup signifikan (> 0.5)
         if (abs(targetZoom - lastZoomLevel) > 0.5) {
             mapView.controller.setZoom(targetZoom)
             lastZoomLevel = targetZoom
         }
     }
 
-    /**
-     * Memutar peta mengikuti bearing dengan smoothing untuk menghindari jitter
-     */
     private fun updateNavigationMode(location: Location) {
+        if (!isOrientationEnabled) return
         val rawBearing = location.bearing
-        // Smoothing dengan faktor 0.2 (20% dari perubahan)
         val smoothBearing = lastBearing + (rawBearing - lastBearing) * 0.2f
         lastBearing = smoothBearing
-
-        mapView.setMapOrientation(-smoothBearing)   // OSMDroid: orientasi positif = berlawanan arah jarum jam
+        mapView.setMapOrientation(-smoothBearing)
     }
 
-    private fun getConditionMarkerIcon(condition: String) = ContextCompat.getDrawable(
-        requireContext(),
-        when (condition) {
-            Constants.CONDITION_BAIK -> R.drawable.ic_marker_green
-            Constants.CONDITION_SEDANG -> R.drawable.ic_marker_yellow
-            Constants.CONDITION_RUSAK_RINGAN -> R.drawable.ic_marker_orange
-            else -> R.drawable.ic_marker_red
-        }
-    )
-
-    // ===== CLEAR (TIDAK HAPUS MARKER LOKASI) =====
     private fun clearMapOverlays() {
-        mapView.overlays.removeAll(segmentMarkers)
         mapView.overlays.remove(currentPolyline)
-
         pathPoints.clear()
-        segmentMarkers.clear()
-
         initCurrentPolyline()
         mapView.invalidate()
     }
-
-    // ========== CHART ==========
 
     private fun setupChart() {
         chart.apply {
@@ -391,7 +283,7 @@ class MapFragment : Fragment() {
                 })
             }
             axisRight.isEnabled = false
-            setBackgroundColor(Color.argb(128, 255, 255, 255)) // semi-transparan putih
+            setBackgroundColor(Color.argb(128, 255, 255, 255))
             setNoDataText(getString(R.string.chart_no_data))
             setNoDataTextColor(Color.WHITE)
         }
@@ -433,12 +325,9 @@ class MapFragment : Fragment() {
         }
     }
 
-    // ========== CLICK LISTENERS ==========
-
     private fun setupClickListeners() {
         fabSurvey.setOnClickListener { handleSurveyButtonClick() }
         fabStop.setOnClickListener { showStopSurveyConfirmation() }
-        fabSegment.setOnClickListener { handleSegmentButtonClick() }
 
         fabToggleChart.setOnClickListener {
             isChartVisible = !isChartVisible
@@ -450,7 +339,7 @@ class MapFragment : Fragment() {
 
         fabCamera.setOnClickListener {
             if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
-                openQuickCamera()
+                openCamera()
             } else {
                 showToast(getString(R.string.survey_not_active))
             }
@@ -458,7 +347,7 @@ class MapFragment : Fragment() {
 
         fabVoice.setOnClickListener {
             if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
-                openQuickVoiceNote()
+                openVoiceRecorder()
             } else {
                 showToast(getString(R.string.survey_not_active))
             }
@@ -466,8 +355,19 @@ class MapFragment : Fragment() {
 
         fabCondition.setOnClickListener { showConditionPicker() }
         fabSurface.setOnClickListener { showSurfacePicker() }
+
+        fabToggleOrientation.setOnClickListener {
+            isOrientationEnabled = !isOrientationEnabled
+            if (isOrientationEnabled) {
+                showToast(getString(R.string.orientation_enabled))
+            } else {
+                showToast(getString(R.string.orientation_disabled))
+                mapView.setMapOrientation(0f)
+            }
+        }
     }
 
+    // Tambahkan fungsi handleSurveyButtonClick
     private fun handleSurveyButtonClick() {
         when {
             !viewModel.isSurveying.value -> showStartSurveyDialog()
@@ -476,95 +376,80 @@ class MapFragment : Fragment() {
         }
     }
 
-    private fun handleSegmentButtonClick() {
-        if (viewModel.isSegmentStarted.value) {
-            viewModel.endSegment(findNavController())
-        } else {
-            viewModel.startSegment()
-            showToast(getString(R.string.segment_started_toast))
-        }
-    }
-
     private fun showStartSurveyDialog() {
         val view = layoutInflater.inflate(R.layout.dialog_start_survey, null)
         val etSurveyor = view.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etSurveyorName)
+        val etRoadName = view.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etRoadName)
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.start_survey))
             .setView(view)
             .setPositiveButton(getString(R.string.start)) { _, _ ->
                 val surveyor = etSurveyor?.text?.toString()?.trim() ?: ""
+                val roadName = etRoadName?.text?.toString()?.trim() ?: ""
 
                 if (surveyor.isBlank()) {
                     showToast("Nama surveyor wajib diisi")
                     return@setPositiveButton
                 }
 
-                startSurvey(surveyor)
+                viewModel.startSurvey(surveyor, roadName)
             }
             .setNegativeButton(getString(R.string.cancel), null)
             .show()
     }
 
-    private fun startSurvey(surveyorName: String) {
-        viewModel.startSurvey(surveyorName)
-        clearMapOverlays()
-        showSurveyFABs(true)
-        // Tampilkan chart secara otomatis
-        binding.chartContainer.visibility = View.VISIBLE
-        isChartVisible = true
-        fabToggleChart.setImageResource(R.drawable.ic_chart)
+    private fun openCamera() {
+        showToast("Fitur kamera akan segera hadir")
+        // TODO: implement camera intent
     }
 
-    private fun openQuickCamera() {
-        showToast(getString(R.string.camera_quick_tip))
-        findNavController().navigate(
-            MapFragmentDirections.actionMapFragmentToSegmentBottomSheet(
-                sessionId = 0L,
-                startDistance = 0f,
-                endDistance = 0f,
-                avgVibration = 0f,
-                conditionAuto = viewModel.currentAutoCondition.value,
-                confidence = viewModel.currentConfidence.value,
-                tempCondition = viewModel.tempCondition.value,
-                tempSurface = viewModel.tempSurface.value
-            )
-        )
-    }
-
-    private fun openQuickVoiceNote() {
-        showToast(getString(R.string.voice_quick_tip))
-        // TODO: implement voice note
+    private fun openVoiceRecorder() {
+        showToast("Fitur rekam suara akan segera hadir")
+        // TODO: implement voice recorder
     }
 
     private fun showConditionPicker() {
-        val conditions = listOf(
-            Constants.CONDITION_BAIK,
-            Constants.CONDITION_SEDANG,
-            Constants.CONDITION_RUSAK_RINGAN,
-            Constants.CONDITION_RUSAK_BERAT
-        )
-        val currentIndex = conditions.indexOf(viewModel.tempCondition.value).coerceAtLeast(0)
+        val conditions = Condition.values()
+        val currentCondition = viewModel.currentCondition.value
+        val currentIndex = conditions.indexOf(currentCondition).coerceAtLeast(0)
+
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.pick_condition_title))
-            .setSingleChoiceItems(conditions.toTypedArray(), currentIndex) { dialog, which ->
-                viewModel.setTemporaryCondition(conditions[which])
-                dialog.dismiss()
-                showToast(getString(R.string.condition_selected, conditions[which]))
+            .setSingleChoiceItems(conditions.map { it.name }.toTypedArray(), currentIndex) { dialog, which ->
+                val selected = conditions[which]
+                if (!viewModel.checkConditionConsistency(selected)) {
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle("Peringatan")
+                        .setMessage("Data getaran menunjukkan kondisi yang berbeda. Yakin memilih ${selected.name}?")
+                        .setPositiveButton("Ya") { _, _ ->
+                            viewModel.recordCondition(selected)
+                            dialog.dismiss()
+                        }
+                        .setNegativeButton("Batal", null)
+                        .show()
+                } else {
+                    viewModel.recordCondition(selected)
+                    dialog.dismiss()
+                }
+                showToast(getString(R.string.condition_selected, selected.name))
             }
             .setNegativeButton(getString(R.string.cancel), null)
             .show()
     }
 
     private fun showSurfacePicker() {
-        val surfaces = Constants.SURFACE_TYPES
-        val currentIndex = surfaces.indexOf(viewModel.tempSurface.value).coerceAtLeast(0)
+        val surfaces = Surface.values()
+        val currentSurface = viewModel.currentSurface.value
+        val currentIndex = surfaces.indexOf(currentSurface).coerceAtLeast(0)
+
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.pick_surface_title))
-            .setSingleChoiceItems(surfaces.toTypedArray(), currentIndex) { dialog, which ->
-                viewModel.setTemporarySurface(surfaces[which])
+            .setSingleChoiceItems(surfaces.map { it.name }.toTypedArray(), currentIndex) { dialog, which ->
+                val selected = surfaces[which]
+                viewModel.recordSurface(selected)
                 dialog.dismiss()
-                showToast(getString(R.string.surface_selected, surfaces[which]))
+                showToast(getString(R.string.surface_selected, selected.name))
             }
             .setNegativeButton(getString(R.string.cancel), null)
             .show()
@@ -578,6 +463,7 @@ class MapFragment : Fragment() {
             .setPositiveButton(getString(R.string.save)) { _, _ ->
                 viewModel.stopSurveyAndSave()
                 showSurveyFABs(false)
+                clearMapOverlays()
                 findNavController().navigate(R.id.summaryFragment)
             }
             .setNegativeButton(getString(R.string.discard)) { _, _ ->
@@ -594,7 +480,6 @@ class MapFragment : Fragment() {
     private fun showSurveyFABs(show: Boolean) {
         val visibility = if (show) View.VISIBLE else View.GONE
         fabStop.visibility = visibility
-        fabSegment.visibility = visibility
         fabCamera.visibility = visibility
         fabVoice.visibility = visibility
         fabCondition.visibility = visibility
@@ -621,8 +506,6 @@ class MapFragment : Fragment() {
         Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }
 
-    // ========== OBSERVE VIEW MODEL ==========
-
     @OptIn(FlowPreview::class)
     private fun observeViewModel() {
         combine(viewModel.isSurveying, viewModel.isPaused) { surveying, paused ->
@@ -633,21 +516,10 @@ class MapFragment : Fragment() {
             else showSurveyFABs(false)
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 
-        viewModel.isSegmentStarted.onEach { started ->
-            fabSegment.setImageResource(
-                if (started) R.drawable.ic_flag_end else R.drawable.ic_flag_start
-            )
-            fabSegment.backgroundTintList = ContextCompat.getColorStateList(
-                requireContext(),
-                if (started) R.color.orange else R.color.accent
-            )
-        }.launchIn(viewLifecycleOwner.lifecycleScope)
-
-        // Lokasi → update peta dan marker
         viewModel.location.onEach { location ->
             location?.let {
                 try {
-                    updateMyLocationUI(it)  // marker + lingkaran + zoom + rotasi
+                    updateMyLocationUI(it)
                     if (isFollowingGPS) {
                         smoothFollow(it)
                     }
@@ -657,7 +529,6 @@ class MapFragment : Fragment() {
             }
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 
-        // Gambar polyline saat survey aktif
         combine(
             viewModel.location,
             viewModel.vibration,
@@ -688,39 +559,16 @@ class MapFragment : Fragment() {
             }
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 
-        viewModel.vibration.onEach { vib ->
-            binding.tvVibration.text = getString(R.string.vibration_format, vib)
-            binding.tvVibration.setTextColor(getConditionColor(vib))
+        viewModel.currentCondition.onEach { condition ->
+            binding.tvCondition.text = condition.name
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 
-        viewModel.gpsAccuracy.onEach { acc ->
-            binding.tvGpsAccuracy.text = getString(R.string.accuracy_format, acc)
-            binding.tvGpsAccuracy.setTextColor(when {
-                acc < 5f -> colorBaik
-                acc < 15f -> colorSedang
-                else -> colorRusakBerat
-            })
+        viewModel.currentSurface.onEach { surface ->
+            binding.tvSurface.text = surface.name
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 
-        viewModel.currentAutoCondition.onEach { condition ->
-            binding.tvCondition.text = condition
-            binding.tvCondition.setTextColor(getConditionColor(
-                when (condition) {
-                    Constants.CONDITION_BAIK -> 0f
-                    Constants.CONDITION_SEDANG -> viewModel.thresholdBaik.value + 0.1f
-                    Constants.CONDITION_RUSAK_RINGAN -> viewModel.thresholdSedang.value + 0.1f
-                    else -> viewModel.thresholdRusakRingan.value + 0.1f
-                }
-            ))
-        }.launchIn(viewLifecycleOwner.lifecycleScope)
-
-        viewModel.tempSurface.onEach { surface ->
-            binding.tvSurface.text = surface
-        }.launchIn(viewLifecycleOwner.lifecycleScope)
-
-        // Chart update dengan sampling untuk performa
         viewModel.vibrationHistory
-            .sample(100L) // throttle 10 Hz
+            .sample(100L)
             .onEach { history ->
                 try {
                     if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
@@ -738,6 +586,20 @@ class MapFragment : Fragment() {
             .launchIn(viewLifecycleOwner.lifecycleScope)
     }
 
+    private fun observeDistanceTrigger() {
+        viewModel.distanceTrigger.onEach { distance ->
+            if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
+                Snackbar.make(
+                    binding.root,
+                    "Jarak ${distance.toInt()} m tercapai. Ambil foto?",
+                    Snackbar.LENGTH_LONG
+                ).setAction("Foto") {
+                    openCamera()
+                }.show()
+            }
+        }.launchIn(viewLifecycleOwner.lifecycleScope)
+    }
+
     private fun restoreSurveyState() {
         val isSurveying = viewModel.isSurveying.value
         val isPaused = viewModel.isPaused.value
@@ -748,8 +610,6 @@ class MapFragment : Fragment() {
             isChartVisible = true
         }
     }
-
-    // ========== LIFECYCLE ==========
 
     override fun onResume() {
         super.onResume()

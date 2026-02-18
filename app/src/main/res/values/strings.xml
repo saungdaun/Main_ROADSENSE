@@ -19,7 +19,6 @@
     <!-- Map screen -->
     <string name="start_survey">Mulai Survey</string>
     <string name="stop_survey">Hentikan Survey</string>
-    <string name="create_segment">Buat Segmen</string>
 
     <!-- Units -->
     <string name="unit_kmh">km/h</string>
@@ -35,10 +34,7 @@
     <string name="accuracy_format">Acc: %.1f m</string>
 
     <string name="confidence_value">Confidence: %d%%</string>
-
     <string name="condition_auto">Kondisi otomatis: %s</string>
-
-    <string name="segment_bottom_sheet_title">Buat Segmen Baru</string>
 
     <string name="permission_denied">Izin ditolak: %s</string>
     <string name="gps_accuracy_low">Akurasi GPS rendah</string>
@@ -56,17 +52,12 @@
     <string name="play_failed">Gagal memutar</string>
     <string name="road_name_required">Nama ruas harus diisi</string>
     <string name="default_surface">Aspal</string>
-    <string name="segment_saved">Segmen berhasil disimpan</string>
-    <string name="segment_save_failed">Gagal menyimpan segmen</string>
     <string name="jarak_prefix">Jarak: %s</string>
     <string name="segments_prefix">Segmen: %d</string>
     <string name="confidence_avg_prefix">Confidence rata-rata: %d%%</string>
     <string name="device_prefix">Device: %s</string>
 
-
     <string name="no_sessions">Belum ada survey</string>
-
-
 
     <string name="distance_m">Jarak: %d m</string>
     <string name="distance_km">Jarak: %.2f km</string>
@@ -78,16 +69,12 @@
     <string name="road_name_hint">Nama Ruas</string>
     <string name="condition_hint">Kondisi Visual</string>
     <string name="surface_hint">Jenis Permukaan</string>
-
     <string name="voice_record">Rekam Catatan Suara</string>
-
     <string name="notes_hint">Catatan (opsional)</string>
-
     <string name="save">Simpan</string>
     <string name="total_distance">Total_Jarak\n</string>
     <string name="segment_count">Ruas_Ke\n</string>
     <string name="detail_coming_soon">Detail untuk sesi %d (coming soon)</string>
-
 
     <string name="survey_running">Survey sedang berjalan</string>
     <string name="survey_paused">Survey dijeda</string>
@@ -110,14 +97,11 @@
     <string name="content_desc_surface_fab">Pilih Permukaan</string>
 
     <!-- Strings untuk SummaryFragment - Detail Dialog -->
-
     <string name="detail_title">Detail Survey</string>
-
     <string name="detail_date">Tanggal: %s</string>
     <string name="detail_device">Perangkat: %s</string>
     <string name="detail_surveyor">Surveyor: %s</string>
     <string name="survey_note_hint">Catatan Survey (opsional)</string>
-
     <string name="detail_total_distance">Total Jarak: %s</string>
     <string name="detail_duration">Durasi: %d menit</string>
     <string name="detail_segment_count">Jumlah Segmen: %d</string>
@@ -136,31 +120,25 @@
     <string name="export_failed">Ekspor Gagal</string>
     <string name="export_success_message">File tersimpan di:\n%s</string>
 
-    <!-- Strings untuk Opsi Sesi (sudah ada beberapa, pastikan ini ada) -->
+    <!-- Strings untuk Opsi Sesi -->
     <string name="view_details">Lihat Detail</string>
     <string name="delete">Hapus</string>
     <string name="session_options">Pilih Tindakan</string>
     <string name="delete_session">Hapus Survey</string>
-
-    <string name="delete_session_confirm">
-Apakah Anda yakin ingin menghapus survey ini? Semua data segmen akan ikut terhapus.
-</string>
-
+    <string name="delete_session_confirm">Apakah Anda yakin ingin menghapus survey ini? Semua data segmen akan ikut terhapus.</string>
     <string name="cancel">Batal</string>
     <string name="ok">OK</string>
-    <!-- Segment Bottom Sheet -->
-    <string name="segment_info_format">Awal: %d m, Akhir: %d m, Panjang: %d m, Getaran: %s g, Kondisi otomatis: %s</string>
-    <string name="retake_photo">Ambil Ulang Foto</string>
-    <string name="recording_timer_format">%02d:%02d</string>
-    <!-- Tambahkan di res/values/strings.xml -->
+
+    <!-- Tambahan -->
     <string name="threshold_baik_label">Baik: %s g</string>
     <string name="threshold_sedang_label">Sedang: %s g</string>
     <string name="threshold_rusak_label">Rusak Ringan: %s g</string>
     <string name="gps_interval_label">Interval GPS: %d ms</string>
     <string name="menu_bluetooth">Bluetooth</string>
+
     <!-- strings.xml tambahan -->
     <string name="segment_start_title">Mulai: %s</string>
-    <string name="segment_marker_snippet">%s, %s, %d m</string>
+    <string name="segment_marker_snippet" formatted="false">%s, %s, %d m</string>
     <string name="segment_end_title">Akhir: %s</string>
     <string name="segment_condition_label">Kondisi: %s</string>
     <string name="condition_baik">Baik</string>
@@ -180,9 +158,9 @@ Apakah Anda yakin ingin menghapus survey ini? Semua data segmen akan ikut terhap
     <string name="discard">Buang</string>
     <string name="resume">Lanjutkan</string>
     <string name="surveyor_name_hint">Nama Surveyor (opsional)</string>
-
     <string name="start">Mulai</string>
-
-
-
+    <string name="toggle_orientation">Toggle orientasi</string>
+    <string name="orientation_enabled">Orientasi mengikuti GPS aktif</string>
+    <string name="orientation_disabled">Orientasi mengikuti GPS mati</string>
+    <string name="event_count">Jumlah event</string>
 </resources>

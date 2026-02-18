@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import zaujaani.roadsensebasic.R
+import zaujaani.roadsensebasic.data.local.entity.EventType
 import zaujaani.roadsensebasic.data.local.entity.SurveySession
 import zaujaani.roadsensebasic.databinding.FragmentSummaryBinding
 import zaujaani.roadsensebasic.util.Constants
@@ -19,16 +20,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Fragment daftar sesi survey dan ringkasan detail.
- *
- * Menampilkan:
- * - Daftar semua sesi survey (tanggal, jarak, jumlah segmen)
- * - Detail sesi: distribusi kondisi jalan (Baik/Sedang/Rusak Ringan/Rusak Berat)
- * - Distribusi jenis permukaan (Aspal/Beton/dll)
- * - Info surveyor, perangkat, durasi
- * - Ekspor ke GPX / CSV
- */
 @AndroidEntryPoint
 class SummaryFragment : Fragment() {
 
@@ -113,7 +104,9 @@ class SummaryFragment : Fragment() {
         if (detail.session.surveyorName.isNotBlank()) {
             sb.appendLine(getString(R.string.detail_surveyor, detail.session.surveyorName))
         }
-
+        if (detail.session.roadName.isNotBlank()) {
+            sb.appendLine("🛣 ${detail.session.roadName}")
+        }
 
         // GPS info
         val totalDistText = if (detail.totalDistance < 1000) {
@@ -123,7 +116,6 @@ class SummaryFragment : Fragment() {
         }
         sb.appendLine(getString(R.string.detail_total_distance, totalDistText))
         sb.appendLine(getString(R.string.detail_duration, detail.durationMinutes))
-        sb.appendLine(getString(R.string.detail_segment_count, detail.segments.size))
         sb.appendLine(getString(R.string.detail_avg_confidence, detail.avgConfidence))
         sb.appendLine(getString(R.string.detail_photos, detail.photoCount))
         sb.appendLine(getString(R.string.detail_audios, detail.audioCount))
@@ -165,15 +157,23 @@ class SummaryFragment : Fragment() {
             }
         }
 
-        // Detail per segmen
-        if (detail.segments.isNotEmpty()) {
+        // Detail per event (foto, voice, perubahan kondisi/permukaan)
+        if (detail.events.isNotEmpty()) {
             sb.appendLine()
-            sb.appendLine(getString(R.string.detail_segments_header))
-            detail.segments.forEachIndexed { i, seg ->
-                val len = (seg.endDistance - seg.startDistance).toInt()
-                sb.appendLine("  ${i+1}. ${seg.name.ifBlank { getString(R.string.no_name) }}")
-                sb.appendLine("     ${seg.conditionAuto} | ${seg.surfaceType} | ${len}m")
-                if (seg.notes.isNotBlank()) sb.appendLine("     📝 ${seg.notes}")
+            sb.appendLine("📌 Titik Penting:")
+            detail.events.forEach { event ->
+                val sta = event.distance.toInt()
+                val staStr = "STA ${sta/100}+${sta%100}"
+                val type = when (event.eventType) {
+                    EventType.CONDITION_CHANGE -> "🔵 Kondisi: ${event.value}"
+                    EventType.SURFACE_CHANGE -> "🟢 Permukaan: ${event.value}"
+                    EventType.PHOTO -> "📷 Foto"
+                    EventType.VOICE -> "🎤 Rekaman"
+                }
+                sb.appendLine("  $staStr - $type")
+                if (!event.notes.isNullOrBlank()) {
+                    sb.appendLine("     📝 ${event.notes}")
+                }
             }
         }
 

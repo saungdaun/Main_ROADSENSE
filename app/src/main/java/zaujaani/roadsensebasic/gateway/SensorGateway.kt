@@ -9,11 +9,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
+import zaujaani.roadsensebasic.BuildConfig
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 import kotlin.math.sqrt
-import zaujaani.roadsensebasic.BuildConfig
 
 /**
  * SensorGateway — manages accelerometer data with:

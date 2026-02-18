@@ -6,17 +6,21 @@ import android.location.Location
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.NavController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import zaujaani.roadsensebasic.data.local.entity.Condition
+import zaujaani.roadsensebasic.data.local.entity.Surface
 import zaujaani.roadsensebasic.data.repository.SurveyRepository
 import zaujaani.roadsensebasic.domain.engine.SurveyEngine
 import zaujaani.roadsensebasic.gateway.GPSGateway
@@ -26,15 +30,6 @@ import zaujaani.roadsensebasic.util.Constants
 import zaujaani.roadsensebasic.util.PreferencesManager
 import javax.inject.Inject
 
-/**
- * ViewModel untuk MapFragment.
- *
- * State machine survey:
- * IDLE → SURVEYING → PAUSED → SURVEYING → STOPPED
- *
- * GPS dan sensor dikelola oleh SurveyForegroundService (tidak terganggu lifecycle fragment).
- * ViewModel hanya subscribe ke SurveyEngine StateFlows untuk update UI.
- */
 @HiltViewModel
 class MapViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -47,51 +42,44 @@ class MapViewModel @Inject constructor(
 
     // ========== LOCATION & SENSOR UI STATE ==========
     private val _location = MutableStateFlow<Location?>(null)
-    val location: StateFlow<Location?> = _location
+    val location: StateFlow<Location?> = _location.asStateFlow()
 
     private val _speed = MutableStateFlow(0f)
-    val speed: StateFlow<Float> = _speed
+    val speed: StateFlow<Float> = _speed.asStateFlow()
 
     private val _gpsAccuracy = MutableStateFlow(0f)
-    val gpsAccuracy: StateFlow<Float> = _gpsAccuracy
+    val gpsAccuracy: StateFlow<Float> = _gpsAccuracy.asStateFlow()
 
     private val _distance = MutableStateFlow(0.0)
-    val distance: StateFlow<Double> = _distance
+    val distance: StateFlow<Double> = _distance.asStateFlow()
 
     // Vibration dari engine (sudah terfilter)
     val vibration: StateFlow<Float> = surveyEngine.currentVibration
 
-    // ========== SURVEY STATE (dari SurveyEngine singleton) ==========
+    // ========== SURVEY STATE (dari SurveyEngine) ==========
     val isSurveying: StateFlow<Boolean> = surveyEngine.isSurveying
-    val isPaused: StateFlow<Boolean> = surveyEngine.isPausedFlow
-    val isSegmentStarted: StateFlow<Boolean> = surveyEngine.isSegmentActive
+    val isPaused: StateFlow<Boolean> = surveyEngine.isPaused
     val vibrationHistory: StateFlow<List<Float>> = surveyEngine.vibrationHistory
+
+    // ========== CONDITION & SURFACE (dari engine) ==========
+    val currentCondition: StateFlow<Condition> = MutableStateFlow(Condition.BAIK) // Akan diupdate
+    val currentSurface: StateFlow<Surface> = MutableStateFlow(Surface.ASPAL)
 
     // ========== THRESHOLDS ==========
     private val _thresholdBaik = MutableStateFlow(Constants.DEFAULT_THRESHOLD_BAIK)
-    val thresholdBaik: StateFlow<Float> = _thresholdBaik
+    val thresholdBaik: StateFlow<Float> = _thresholdBaik.asStateFlow()
 
     private val _thresholdSedang = MutableStateFlow(Constants.DEFAULT_THRESHOLD_SEDANG)
-    val thresholdSedang: StateFlow<Float> = _thresholdSedang
+    val thresholdSedang: StateFlow<Float> = _thresholdSedang.asStateFlow()
 
     private val _thresholdRusakRingan = MutableStateFlow(Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN)
-    val thresholdRusakRingan: StateFlow<Float> = _thresholdRusakRingan
+    val thresholdRusakRingan: StateFlow<Float> = _thresholdRusakRingan.asStateFlow()
 
-    // ========== TEMPORARY SELECTION ==========
-    private val _tempCondition = MutableStateFlow(Constants.CONDITION_BAIK)
-    val tempCondition: StateFlow<String> = _tempCondition
+    // ========== TRIGGER JARAK ==========
+    private val _distanceTrigger = MutableSharedFlow<Double>(extraBufferCapacity = 5)
+    val distanceTrigger = _distanceTrigger.asSharedFlow()
 
-    private val _tempSurface = MutableStateFlow(Constants.SURFACE_TYPES.first())
-    val tempSurface: StateFlow<String> = _tempSurface
-
-    // ========== REALTIME ASSESSMENT ==========
-    private val _currentAutoCondition = MutableStateFlow(Constants.CONDITION_BAIK)
-    val currentAutoCondition: StateFlow<String> = _currentAutoCondition
-
-    private val _currentConfidence = MutableStateFlow(0)
-    val currentConfidence: StateFlow<Int> = _currentConfidence
-
-    // ========== LOCATION TRACKING (untuk UI peta saja) ==========
+    // ========== LOCATION TRACKING ==========
     private var locationTrackingJob: Job? = null
 
     init {
@@ -105,20 +93,10 @@ class MapViewModel @Inject constructor(
             preferencesManager.thresholdRusakRingan.collect { _thresholdRusakRingan.value = it }
         }
 
-        // Update penilaian otomatis saat getaran berubah (dari engine)
-        surveyEngine.currentVibration
-            .onEach { _ ->
-                if (surveyEngine.isSurveying.value && !surveyEngine.isPausedFlow.value) {
-                    _currentAutoCondition.value = surveyEngine.getCurrentConditionAuto()
-                    _currentConfidence.value = surveyEngine.getCurrentConfidence()
-                }
-            }
-            .launchIn(viewModelScope)
-
-        // Subscribe ke jarak dari engine
-        surveyEngine.currentDistance
-            .onEach { _distance.value = it }
-            .launchIn(viewModelScope)
+        // Update kondisi dan surface dari engine (perlu ditambahkan di engine nanti)
+        // Untuk sementara, kita bisa set nilai default. Nanti engine akan punya state untuk kondisi dan surface.
+        // Atau kita bisa mengambil dari event terakhir? Namun untuk sederhana, kita pakai state di viewmodel sendiri.
+        // Kita akan update dari engine nanti setelah ada mekanisme.
     }
 
     // ========== LOCATION TRACKING ==========
@@ -127,7 +105,6 @@ class MapViewModel @Inject constructor(
         locationTrackingJob = gpsGateway.getLocationFlow()
             .catch { e ->
                 Timber.e(e, "Error in location flow")
-                // Bisa emit nilai default atau handle error
             }
             .onEach { location ->
                 _location.value = location
@@ -186,62 +163,33 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    // ========== SEGMENT MANAGEMENT ==========
-    fun startSegment() {
-        if (!surveyEngine.isSurveying.value || surveyEngine.isPausedFlow.value) {
-            Timber.w("Cannot start segment: surveying=${surveyEngine.isSurveying.value}, paused=${surveyEngine.isPausedFlow.value}")
-            return
-        }
-        surveyEngine.startSegment()
-        Timber.d("Segment started")
+    // ========== EVENT RECORDING ==========
+    fun recordCondition(condition: Condition) {
+        surveyEngine.recordConditionChange(condition)
+        // Update local state jika perlu
+        (currentCondition as MutableStateFlow).value = condition
+        Timber.d("Condition recorded: $condition")
     }
 
-    fun endSegment(navController: NavController) {
-        if (!surveyEngine.isSegmentActive.value) {
-            Timber.w("No active segment to end")
-            return
-        }
-
-        val sessionId = surveyEngine.getCurrentSessionId() ?: run {
-            Timber.e("Cannot end segment: no active session")
-            return
-        }
-
-        val startDist = surveyEngine.getSegmentStartDistance().toFloat()
-        val endDist = surveyEngine.getCurrentDistance().toFloat()
-        val avgVibration = surveyEngine.getCurrentAvgVibration().toFloat()
-        val conditionAuto = surveyEngine.getCurrentConditionAuto()
-        val confidence = surveyEngine.getCurrentConfidence()
-
-        val action = MapFragmentDirections.actionMapFragmentToSegmentBottomSheet(
-            sessionId = sessionId,
-            startDistance = startDist,
-            endDistance = endDist,
-            avgVibration = avgVibration,
-            conditionAuto = conditionAuto,
-            confidence = confidence,
-            tempCondition = _tempCondition.value,
-            tempSurface = _tempSurface.value
-        )
-        navController.navigate(action)
-        Timber.d("Navigated to segment bottom sheet for session $sessionId")
-        // Segment akan direset setelah bottom sheet dismiss (di engine via cancel atau end)
+    fun recordSurface(surface: Surface) {
+        surveyEngine.recordSurfaceChange(surface)
+        (currentSurface as MutableStateFlow).value = surface
+        Timber.d("Surface recorded: $surface")
     }
 
-    fun cancelSegment() {
-        surveyEngine.cancelSegment()
-        Timber.d("Segment cancelled")
+    fun recordPhoto(path: String, notes: String? = null) {
+        surveyEngine.recordPhoto(path, notes)
+        Timber.d("Photo recorded: $path")
     }
 
-    // ========== SETTERS ==========
-    fun setTemporaryCondition(condition: String) {
-        _tempCondition.value = condition
-        Timber.d("Temporary condition set to $condition")
+    fun recordVoice(path: String, notes: String? = null) {
+        surveyEngine.recordVoice(path, notes)
+        Timber.d("Voice recorded: $path")
     }
 
-    fun setTemporarySurface(surface: String) {
-        _tempSurface.value = surface
-        Timber.d("Temporary surface set to $surface")
+    // ========== VALIDASI KONSISTENSI ==========
+    fun checkConditionConsistency(condition: Condition): Boolean {
+        return surveyEngine.checkConditionConsistency(condition)
     }
 
     // ========== FOREGROUND SERVICE ==========

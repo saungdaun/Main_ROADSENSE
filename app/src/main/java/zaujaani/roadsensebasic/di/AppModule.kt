@@ -10,7 +10,6 @@ import zaujaani.roadsensebasic.data.local.RoadSenseDatabase
 import zaujaani.roadsensebasic.data.repository.SurveyRepository
 import zaujaani.roadsensebasic.data.repository.TelemetryRepository
 import zaujaani.roadsensebasic.domain.engine.ConfidenceCalculator
-import zaujaani.roadsensebasic.domain.engine.SegmentSummaryGenerator
 import zaujaani.roadsensebasic.domain.engine.SurveyEngine
 import zaujaani.roadsensebasic.domain.engine.VibrationAnalyzer
 import zaujaani.roadsensebasic.gateway.GPSGateway
@@ -61,12 +60,6 @@ object AppModule {
     @Singleton
     fun provideConfidenceCalculator(): ConfidenceCalculator {
         return ConfidenceCalculator()
-    }
-
-    @Provides
-    @Singleton
-    fun provideSegmentSummaryGenerator(): SegmentSummaryGenerator {
-        return SegmentSummaryGenerator()
     }
 
     @Provides
