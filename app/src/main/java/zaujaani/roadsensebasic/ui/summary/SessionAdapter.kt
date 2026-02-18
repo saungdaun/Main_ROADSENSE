@@ -2,35 +2,48 @@ package zaujaani.roadsensebasic.ui.summary
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import zaujaani.roadsensebasic.R
 import zaujaani.roadsensebasic.data.repository.SessionWithCount
 import zaujaani.roadsensebasic.databinding.ItemSessionBinding
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
+/**
+ * Adapter untuk daftar sesi survey dengan DiffUtil untuk update efisien.
+ */
 class SessionAdapter(
     private val onItemClick: (SessionWithCount) -> Unit,
-    private val onDetailClick: (SessionWithCount) -> Unit  // tambahan
-) : RecyclerView.Adapter<SessionAdapter.SessionViewHolder>() {
+    private val onDetailClick: (SessionWithCount) -> Unit
+) : ListAdapter<SessionWithCount, SessionAdapter.SessionViewHolder>(DIFF_CALLBACK) {
 
-    private var items = listOf<SessionWithCount>()
+    companion object {
+        private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<SessionWithCount>() {
+            override fun areItemsTheSame(old: SessionWithCount, new: SessionWithCount): Boolean {
+                return old.session.id == new.session.id
+            }
 
-    fun submitList(list: List<SessionWithCount>) {
-        items = list
-        notifyDataSetChanged()
+            override fun areContentsTheSame(old: SessionWithCount, new: SessionWithCount): Boolean {
+                return old == new
+            }
+        }
     }
 
+    // Tidak perlu mendefinisikan ulang submitList, gunakan dari ListAdapter
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SessionViewHolder {
-        val binding = ItemSessionBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        val binding = ItemSessionBinding.inflate(
+            LayoutInflater.from(parent.context), parent, false
+        )
         return SessionViewHolder(binding, onItemClick, onDetailClick)
     }
 
     override fun onBindViewHolder(holder: SessionViewHolder, position: Int) {
-        holder.bind(items[position])
+        holder.bind(getItem(position))
     }
-
-    override fun getItemCount() = items.size
 
     class SessionViewHolder(
         private val binding: ItemSessionBinding,
@@ -38,28 +51,40 @@ class SessionAdapter(
         private val onDetailClick: (SessionWithCount) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
+        private val dateFormat = SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault())
+
         fun bind(item: SessionWithCount) {
             val session = item.session
-            val dateFormat = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault())
-            binding.tvDate.text = dateFormat.format(session.startTime)
+            val ctx = binding.root.context
 
-            binding.tvDevice.text = binding.root.context.getString(R.string.device_model, session.deviceModel)
+            // Tanggal
+            binding.tvDate.text = dateFormat.format(Date(session.startTime))
 
+            // Device
+            binding.tvDevice.text = ctx.getString(R.string.device_model, session.deviceModel)
+
+            // Jarak total
             binding.tvTotalDistance.text = if (session.totalDistance < 1000) {
-                binding.root.context.getString(R.string.distance_m, session.totalDistance.toInt())
+                ctx.getString(R.string.distance_m_format, session.totalDistance.toInt())
             } else {
-                binding.root.context.getString(R.string.distance_km, session.totalDistance / 1000)
+                ctx.getString(R.string.distance_km_format, session.totalDistance / 1000.0)
             }
 
+            // Jumlah segmen
             binding.tvSegmentCount.text = item.segmentCount.toString()
 
-            binding.root.setOnClickListener {
-                onItemClick(item)
+            // Nama surveyor + jalan (jika ada)
+            if (session.roadName.isNotBlank() || session.surveyorName.isNotBlank()) {
+                val info = buildString {
+                    if (session.roadName.isNotBlank()) append("🛣 ${session.roadName}")
+                    if (session.roadName.isNotBlank() && session.surveyorName.isNotBlank()) append("  ")
+                    if (session.surveyorName.isNotBlank()) append("👤 ${session.surveyorName}")
+                }
+                binding.tvDevice.text = info
             }
 
-            binding.btnViewDetails.setOnClickListener {
-                onDetailClick(item)
-            }
+            binding.root.setOnClickListener { onItemClick(item) }
+            binding.btnViewDetails.setOnClickListener { onDetailClick(item) }
         }
     }
 }

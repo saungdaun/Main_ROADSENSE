@@ -1,18 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-    <color name="primary">#2196F3</color>
-    <color name="primary_dark">#1976D2</color>
-    <color name="accent">#FF4081</color>
-    <color name="background">#F5F5F5</color>
-    <color name="surface">#FFFFFF</color>
-    <color name="text_primary">#DE000000</color>
-    <color name="text_secondary">#8A000000</color>
+
     <color name="error">#F44336</color>
     <color name="gray">#888888</color>
-    <color name="green">#4CAF50</color>
-    <color name="yellow">#FFC107</color>
-    <color name="orange">#FF9800</color>
-    <color name="red">#F44336</color>
+
+
+    <!-- Base Colors -->
+    <color name="black">#FF000000</color>
+        <color name="white">#FFFFFFFF</color>
+
+        <!-- Brand Colors -->
+        <color name="primary">#1565C0</color>
+        <color name="primary_dark">#0D47A1</color>
+        <color name="primary_light">#1E88E5</color>
+        <color name="accent">#FF6D00</color>
+
+
+        <!-- Surface & Background -->
+        <color name="background">#F8F9FA</color>
+        <color name="surface">#FFFFFF</color>
+        <color name="surface_dark">#1E1E1E</color>
+
+        <!-- Text -->
+        <color name="text_primary">#DE000000</color>
+        <color name="text_secondary">#8A000000</color>
+        <color name="text_on_primary">#FFFFFFFF</color>
+
+        <!-- Condition Colors (Jalan) -->
+        <color name="green">#2E7D32</color>       <!-- Baik -->
+        <color name="green_light">#4CAF50</color>
+        <color name="yellow">#F57F17</color>      <!-- Sedang -->
+        <color name="yellow_light">#FFC107</color>
+        <color name="orange">#E65100</color>      <!-- Rusak Ringan -->
+        <color name="orange_light">#FF9800</color>
+        <color name="red">#B71C1C</color>         <!-- Rusak Berat -->
+        <color name="red_light">#F44336</color>
+
+
+        <color name="gray_light">#E0E0E0</color>
+        <color name="transparent_black">#AA000000</color>
+
+
+
 </resources>

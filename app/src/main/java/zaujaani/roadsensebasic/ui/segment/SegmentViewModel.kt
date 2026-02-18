@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import zaujaani.roadsensebasic.data.local.entity.RoadSegment
 import zaujaani.roadsensebasic.data.repository.SurveyRepository
 import javax.inject.Inject
@@ -37,7 +38,6 @@ class SegmentViewModel @Inject constructor(
     ) {
         _isSaving.value = true
 
-        // Gunakan ifBlank untuk menggantikan if (manualCondition.isNotBlank()) manualCondition else conditionAuto
         val finalCondition = manualCondition.ifBlank { conditionAuto }
 
         val segment = RoadSegment(
@@ -52,15 +52,21 @@ class SegmentViewModel @Inject constructor(
             notes = notes,
             photoPath = photoPath,
             audioPath = audioPath,
+            // Koordinat tidak dikirim dari args, biarkan default 0.0
+            startLat = 0.0,
+            startLng = 0.0,
+            endLat = 0.0,
+            endLng = 0.0,
             createdAt = System.currentTimeMillis()
         )
 
         viewModelScope.launch {
             try {
                 surveyRepository.insertSegment(segment)
+                Timber.i("Segment saved: $roadName")
                 _saveResult.value = true
             } catch (e: Exception) {
-                e.printStackTrace()
+                Timber.e(e, "Failed to save segment")
                 _saveResult.value = false
             } finally {
                 _isSaving.value = false

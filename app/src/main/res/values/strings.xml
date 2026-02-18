@@ -64,17 +64,10 @@
     <string name="device_prefix">Device: %s</string>
 
 
-    <string name="no_sessions">Belum ada sesi survey</string>
-    <string name="session_options">Pilih Tindakan</string>
-    <string name="view_details">Lihat Detail</string>
-    <string name="delete">Hapus</string>
-    <string name="export_gpx">Ekspor GPX</string>
-    <string name="delete_session">Hapus Sesi</string>
-    <string name="delete_session_confirm">Apakah Anda yakin ingin menghapus sesi ini? Semua data segmen akan ikut terhapus.</string>
+    <string name="no_sessions">Belum ada survey</string>
 
-    <string name="export_success">Ekspor Berhasil</string>
-    <string name="export_success_message">File tersimpan di:\n%s</string>
-    <string name="export_failed">Gagal mengekspor</string>
+
+
     <string name="distance_m">Jarak: %d m</string>
     <string name="distance_km">Jarak: %.2f km</string>
     <string name="segments_count">Segmen: %d</string>
@@ -94,11 +87,102 @@
     <string name="total_distance">Total_Jarak\n</string>
     <string name="segment_count">Ruas_Ke\n</string>
     <string name="detail_coming_soon">Detail untuk sesi %d (coming soon)</string>
-    <string name="ok">OK</string>
 
 
+    <string name="survey_running">Survey sedang berjalan</string>
+    <string name="survey_paused">Survey dijeda</string>
+    <string name="notification_survey_progress">Jarak: %s</string>
+    <string name="notification_channel_desc">Menampilkan status survey</string>
+    <string name="notification_title">RoadSense Survey</string>
+
+    <string name="label_speed">Kecepatan</string>
+    <string name="label_distance">Jarak</string>
+    <string name="label_vibration">Getaran</string>
+    <string name="label_accuracy">Akurasi</string>
+    <string name="chart_label_z">Z-Axis (g)</string>
+    <string name="content_desc_survey_fab">Mulai / Jeda Survey</string>
+    <string name="content_desc_stop_fab">Hentikan Survey</string>
+    <string name="content_desc_segment_fab">Buat Segmen</string>
+    <string name="content_desc_chart_toggle">Tampilkan Grafik</string>
+    <string name="content_desc_camera_fab">Ambil Foto</string>
+    <string name="content_desc_voice_fab">Rekam Suara</string>
+    <string name="content_desc_condition_fab">Pilih Kondisi</string>
+    <string name="content_desc_surface_fab">Pilih Permukaan</string>
+
+    <!-- Strings untuk SummaryFragment - Detail Dialog -->
+
+    <string name="detail_title">Detail Survey</string>
+
+    <string name="detail_date">Tanggal: %s</string>
+    <string name="detail_device">Perangkat: %s</string>
+    <string name="detail_surveyor">Surveyor: %s</string>
+    <string name="survey_note_hint">Catatan Survey (opsional)</string>
+
+    <string name="detail_total_distance">Total Jarak: %s</string>
+    <string name="detail_duration">Durasi: %d menit</string>
+    <string name="detail_segment_count">Jumlah Segmen: %d</string>
+    <string name="detail_avg_confidence">Rata-rata Confidence: %d%%</string>
+    <string name="detail_photos">Jumlah Foto: %d</string>
+    <string name="detail_audios">Jumlah Rekaman: %d</string>
+    <string name="detail_condition_header">Distribusi Kondisi Jalan:</string>
+    <string name="detail_surface_header">Distribusi Permukaan:</string>
+    <string name="detail_segments_header">Daftar Segmen:</string>
+    <string name="no_name">Tanpa Nama</string>
+
+    <!-- Strings untuk Ekspor -->
+    <string name="export_csv">Ekspor CSV</string>
+    <string name="export_gpx">Ekspor GPX</string>
+    <string name="export_success">Ekspor Berhasil</string>
+    <string name="export_failed">Ekspor Gagal</string>
+    <string name="export_success_message">File tersimpan di:\n%s</string>
+
+    <!-- Strings untuk Opsi Sesi (sudah ada beberapa, pastikan ini ada) -->
+    <string name="view_details">Lihat Detail</string>
+    <string name="delete">Hapus</string>
+    <string name="session_options">Pilih Tindakan</string>
+    <string name="delete_session">Hapus Survey</string>
+
+    <string name="delete_session_confirm">
+Apakah Anda yakin ingin menghapus survey ini? Semua data segmen akan ikut terhapus.
+</string>
 
     <string name="cancel">Batal</string>
+    <string name="ok">OK</string>
+    <!-- Segment Bottom Sheet -->
+    <string name="segment_info_format">Awal: %d m, Akhir: %d m, Panjang: %d m, Getaran: %s g, Kondisi otomatis: %s</string>
+    <string name="retake_photo">Ambil Ulang Foto</string>
+    <string name="recording_timer_format">%02d:%02d</string>
+    <!-- Tambahkan di res/values/strings.xml -->
+    <string name="threshold_baik_label">Baik: %s g</string>
+    <string name="threshold_sedang_label">Sedang: %s g</string>
+    <string name="threshold_rusak_label">Rusak Ringan: %s g</string>
+    <string name="gps_interval_label">Interval GPS: %d ms</string>
+    <string name="menu_bluetooth">Bluetooth</string>
+    <!-- strings.xml tambahan -->
+    <string name="segment_start_title">Mulai: %s</string>
+    <string name="segment_marker_snippet">%s, %s, %d m</string>
+    <string name="segment_end_title">Akhir: %s</string>
+    <string name="segment_condition_label">Kondisi: %s</string>
+    <string name="condition_baik">Baik</string>
+    <string name="condition_sedang">Sedang</string>
+    <string name="condition_rusak_ringan">Rusak Ringan</string>
+    <string name="chart_no_data">Tunggu data...</string>
+    <string name="chart_z_label">Z-Axis (g)</string>
+    <string name="survey_not_active">Survey tidak aktif</string>
+    <string name="segment_started_toast">Segmen dimulai</string>
+    <string name="camera_quick_tip">Ambil foto cepat</string>
+    <string name="voice_quick_tip">Rekam catatan suara</string>
+    <string name="pick_condition_title">Pilih Kondisi</string>
+    <string name="condition_selected">Kondisi: %s</string>
+    <string name="pick_surface_title">Pilih Permukaan</string>
+    <string name="surface_selected">Permukaan: %s</string>
+    <string name="stop_survey_confirm">Apakah Anda yakin ingin menghentikan survey?</string>
+    <string name="discard">Buang</string>
+    <string name="resume">Lanjutkan</string>
+    <string name="surveyor_name_hint">Nama Surveyor (opsional)</string>
+
+    <string name="start">Mulai</string>
+
 
 
 </resources>

@@ -4,16 +4,21 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.slider.Slider
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import zaujaani.roadsensebasic.R
 import zaujaani.roadsensebasic.databinding.FragmentSettingsBinding
 import zaujaani.roadsensebasic.util.PreferencesManager
+import java.util.Locale
 import javax.inject.Inject
 
+/**
+ * Fragment pengaturan kalibrasi threshold getaran, GPS interval, tema, dan satuan.
+ * Semua nilai disimpan di DataStore dan dibaca ulang saat dibuka.
+ */
 @AndroidEntryPoint
 class SettingsFragment : Fragment() {
 
@@ -23,41 +28,54 @@ class SettingsFragment : Fragment() {
     @Inject
     lateinit var preferencesManager: PreferencesManager
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    // Flag untuk mencegah infinite loop saat load preferences
+    private var isLoadingPrefs = false
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         loadPreferences()
         setupListeners()
     }
 
     private fun loadPreferences() {
+        isLoadingPrefs = true
+
         lifecycleScope.launch {
             preferencesManager.thresholdBaik.collect { value ->
-                binding.sliderBaik.value = value
-                binding.tvBaik.text = "Baik: ${value}g"
+                if (!isLoadingPrefs) return@collect
+                binding.sliderBaik.value = value.coerceIn(0.1f, 0.5f)
+                binding.tvBaik.text = getString(R.string.threshold_baik_label,
+                    String.format(Locale.US, "%.2f", value))
+                isLoadingPrefs = false
             }
         }
         lifecycleScope.launch {
             preferencesManager.thresholdSedang.collect { value ->
-                binding.sliderSedang.value = value
-                binding.tvSedang.text = "Sedang: ${value}g"
+                binding.sliderSedang.value = value.coerceIn(0.4f, 0.8f)
+                binding.tvSedang.text = getString(R.string.threshold_sedang_label,
+                    String.format(Locale.US, "%.2f", value))
             }
         }
         lifecycleScope.launch {
             preferencesManager.thresholdRusakRingan.collect { value ->
-                binding.sliderRusakRingan.value = value
-                binding.tvRusakRingan.text = "Rusak Ringan: ${value}g"
+                binding.sliderRusakRingan.value = value.coerceIn(0.8f, 1.5f)
+                binding.tvRusakRingan.text = getString(R.string.threshold_rusak_label,
+                    String.format(Locale.US, "%.2f", value))
             }
         }
         lifecycleScope.launch {
             preferencesManager.gpsInterval.collect { value ->
-                binding.sliderGpsInterval.value = value.toFloat()
-                binding.tvGpsInterval.text = "$value ms"
+                binding.sliderGpsInterval.value = value.toFloat().coerceIn(500f, 5000f)
+                binding.tvGpsInterval.text = getString(R.string.gps_interval_label, value)
             }
         }
         lifecycleScope.launch {
@@ -80,39 +98,31 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupListeners() {
-        binding.sliderBaik.addOnChangeListener { slider, value, fromUser ->
-            binding.tvBaik.text = "Baik: ${value}g"
+        binding.sliderBaik.addOnChangeListener { _, value, fromUser ->
+            binding.tvBaik.text = getString(R.string.threshold_baik_label, String.format(Locale.US, "%.2f", value))
             if (fromUser) {
-                lifecycleScope.launch {
-                    preferencesManager.setThresholdBaik(value)
-                }
+                lifecycleScope.launch { preferencesManager.setThresholdBaik(value) }
             }
         }
 
-        binding.sliderSedang.addOnChangeListener { slider, value, fromUser ->
-            binding.tvSedang.text = "Sedang: ${value}g"
+        binding.sliderSedang.addOnChangeListener { _, value, fromUser ->
+            binding.tvSedang.text = getString(R.string.threshold_sedang_label, String.format(Locale.US, "%.2f", value))
             if (fromUser) {
-                lifecycleScope.launch {
-                    preferencesManager.setThresholdSedang(value)
-                }
+                lifecycleScope.launch { preferencesManager.setThresholdSedang(value) }
             }
         }
 
-        binding.sliderRusakRingan.addOnChangeListener { slider, value, fromUser ->
-            binding.tvRusakRingan.text = "Rusak Ringan: ${value}g"
+        binding.sliderRusakRingan.addOnChangeListener { _, value, fromUser ->
+            binding.tvRusakRingan.text = getString(R.string.threshold_rusak_label, String.format(Locale.US, "%.2f", value))
             if (fromUser) {
-                lifecycleScope.launch {
-                    preferencesManager.setThresholdRusakRingan(value)
-                }
+                lifecycleScope.launch { preferencesManager.setThresholdRusakRingan(value) }
             }
         }
 
-        binding.sliderGpsInterval.addOnChangeListener { slider, value, fromUser ->
-            binding.tvGpsInterval.text = "${value.toInt()} ms"
+        binding.sliderGpsInterval.addOnChangeListener { _, value, fromUser ->
+            binding.tvGpsInterval.text = getString(R.string.gps_interval_label, value.toInt())
             if (fromUser) {
-                lifecycleScope.launch {
-                    preferencesManager.setGpsInterval(value.toInt())
-                }
+                lifecycleScope.launch { preferencesManager.setGpsInterval(value.toInt()) }
             }
         }
 
@@ -122,9 +132,7 @@ class SettingsFragment : Fragment() {
                 binding.radioMi.id -> "mi"
                 else -> "km"
             }
-            lifecycleScope.launch {
-                preferencesManager.setDistanceUnit(unit)
-            }
+            lifecycleScope.launch { preferencesManager.setDistanceUnit(unit) }
         }
 
         binding.radioGroupTheme.setOnCheckedChangeListener { _, checkedId ->
@@ -135,7 +143,13 @@ class SettingsFragment : Fragment() {
             }
             lifecycleScope.launch {
                 preferencesManager.setTheme(theme)
-                // Di sini bisa tambahkan logic untuk mengubah tema aplikasi
+                // Terapkan tema seketika
+                val mode = when (theme) {
+                    "light" -> AppCompatDelegate.MODE_NIGHT_NO
+                    "dark" -> AppCompatDelegate.MODE_NIGHT_YES
+                    else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                }
+                AppCompatDelegate.setDefaultNightMode(mode)
             }
         }
     }

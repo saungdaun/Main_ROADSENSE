@@ -4,16 +4,21 @@
     <item
         android:id="@+id/mapFragment"
         android:title="@string/menu_map"
-        android:icon="@android:drawable/ic_menu_mapmode"/>
+        android:icon="@android:drawable/ic_menu_mapmode" />
 
     <item
         android:id="@+id/summaryFragment"
         android:title="@string/menu_summary"
-        android:icon="@android:drawable/ic_menu_agenda"/>
+        android:icon="@android:drawable/ic_menu_agenda" />
 
     <item
         android:id="@+id/settingsFragment"
         android:title="@string/menu_settings"
-        android:icon="@android:drawable/ic_menu_preferences"/>
+        android:icon="@android:drawable/ic_menu_preferences" />
+
+    <item
+        android:id="@+id/bluetoothFragment"
+        android:title="@string/menu_bluetooth"
+        android:icon="@android:drawable/ic_menu_share" />
 
 </menu>

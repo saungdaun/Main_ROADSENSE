@@ -1,104 +1,236 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- Map fills entire screen -->
     <org.osmdroid.views.MapView
         android:id="@+id/mapView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Panel info di atas (6 item) -->
+    <!-- TOP INFO BAR — always visible, semi-transparent -->
     <LinearLayout
-        android:id="@+id/infoPanel"
+        android:id="@+id/topInfoBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="4dp"
-        android:background="#AA000000"
         android:layout_gravity="top"
-        android:gravity="center"
-        android:weightSum="6">
+        android:baselineAligned="false"
+        android:orientation="horizontal"
+        android:background="@color/transparent_black"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:gravity="center_vertical"
+        android:weightSum="5">
+
+        <!-- Speed -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/tvSpeed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 km/j"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_speed"
+                android:textColor="@color/gray_light"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- Distance -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/tvDistance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 m"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_distance"
+                android:textColor="@color/gray_light"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- Vibration (Z-Axis) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/tvVibration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0.00 g"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_vibration"
+                android:textColor="@color/gray_light"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- GPS Accuracy -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/tvGpsAccuracy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="±-- m"
+                android:textColor="@color/green_light"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_accuracy"
+                android:textColor="@color/gray_light"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- Altitude -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/tvAltitude"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 m"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Altitude"
+                android:textColor="@color/gray_light"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ACTIVE SEGMENT BAR — muncul saat segment aktif -->
+    <LinearLayout
+        android:id="@+id/segmentInfoBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_marginTop="56dp"
+        android:orientation="horizontal"
+        android:background="@color/primary_dark"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:gravity="center_vertical"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_flag_start"
+            android:layout_marginEnd="8dp"
+            app:tint="@color/white" />
 
         <TextView
-            android:id="@+id/tvSpeed"
+            android:id="@+id/tvSegmentStartKm"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="0 km/h"
-            android:textColor="#FFF"
-            android:textSize="10sp"
-            android:gravity="center" />
-
-        <TextView
-            android:id="@+id/tvDistance"
-            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="0 m"
-            android:textColor="#FFF"
-            android:textSize="10sp"
-            android:gravity="center" />
-
-        <TextView
-            android:id="@+id/tvVibration"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="0.00 g"
-            android:textColor="#FFF"
-            android:textSize="10sp"
-            android:gravity="center" />
-
-        <TextView
-            android:id="@+id/tvGpsAccuracy"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Acc:--m"
-            android:textColor="#FFF"
-            android:textSize="10sp"
-            android:gravity="center" />
+            android:text="Awal: 0 m"
+            android:textColor="@color/white"
+            android:textSize="13sp" />
 
         <TextView
             android:id="@+id/tvCondition"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:text="Baik"
-            android:textColor="#FFF"
-            android:textSize="10sp"
-            android:gravity="center" />
+            android:textColor="@color/green_light"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginEnd="16dp" />
 
         <TextView
             android:id="@+id/tvSurface"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:text="Aspal"
-            android:textColor="#FFF"
-            android:textSize="10sp"
-            android:gravity="center" />
+            android:textColor="@color/primary_light"
+            android:textSize="13sp" />
     </LinearLayout>
 
-    <!-- Grafik Z-axis -->
+    <!-- CHART PANEL — di bawah -->
     <LinearLayout
         android:id="@+id/chartContainer"
         android:layout_width="match_parent"
         android:layout_height="160dp"
         android:layout_gravity="bottom"
-        android:background="#AA000000"
+        android:background="@color/transparent_black"
         android:orientation="vertical"
-        android:padding="4dp">
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Z-Axis (g)"
-            android:textColor="#FFF"
-            android:textSize="12sp"
-            android:layout_marginStart="8dp"/>
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/chart_label_z"
+                android:textColor="@color/gray_light"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvChartConditionBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textColor="@color/green_light"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <com.github.mikephil.charting.charts.LineChart
             android:id="@+id/chartVibration"
@@ -107,7 +239,7 @@
             android:layout_weight="1" />
     </LinearLayout>
 
-    <!-- Floating Action Buttons (kanan) -->
+    <!-- RIGHT SIDE — Main FABs -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabSurvey"
         android:layout_width="wrap_content"
@@ -115,89 +247,37 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
         android:src="@drawable/ic_play"
-        android:contentDescription="Start/Stop Survey"
-        app:backgroundTint="@color/design_default_color_primary" />
-
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabSegment"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
-        android:layout_marginBottom="80dp"
-        android:src="@drawable/ic_flag"
-        android:contentDescription="Buat Segmen"
-        app:backgroundTint="@color/design_default_color_secondary"
-        android:visibility="gone" />
+        app:backgroundTint="@color/primary"
+        app:tint="@color/white"
+        app:elevation="8dp" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabStop"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
-        android:layout_marginBottom="144dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="84dp"
         android:src="@drawable/ic_stop"
         android:visibility="gone"
-        app:backgroundTint="@color/red"
-        android:contentDescription="Stop Survey" />
-
-    <!-- Floating Action Buttons (kiri) untuk akses cepat -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabCamera"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|start"
-        android:layout_margin="16dp"
-        android:layout_marginBottom="80dp"
-        android:src="@drawable/ic_camera"
-        app:backgroundTint="@color/primary"
-        app:fabSize="mini"
-        android:visibility="gone"
-        android:contentDescription="Ambil Foto" />
+        app:backgroundTint="@color/red_light"
+        app:tint="@color/white"
+        app:elevation="8dp" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabVoice"
+        android:id="@+id/fabSegment"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|start"
-        android:layout_margin="16dp"
-        android:layout_marginBottom="144dp"
-        android:src="@drawable/ic_mic"
-        app:backgroundTint="@color/primary"
-        app:fabSize="mini"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="152dp"
+        android:src="@drawable/ic_flag_start"
         android:visibility="gone"
-        android:contentDescription="Rekam Suara" />
+        app:backgroundTint="@color/accent"
+        app:tint="@color/white"
+        app:elevation="8dp" />
 
-    <!-- Tombol Kondisi -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabCondition"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|start"
-        android:layout_margin="16dp"
-        android:layout_marginBottom="208dp"
-        android:src="@drawable/ic_condition"
-        app:backgroundTint="@color/primary"
-        app:fabSize="mini"
-        android:visibility="gone"
-        android:contentDescription="Pilih Kondisi Jalan" />
-
-    <!-- Tombol Permukaan -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabSurface"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|start"
-        android:layout_margin="16dp"
-        android:layout_marginBottom="272dp"
-        android:src="@drawable/ic_surface"
-        app:backgroundTint="@color/primary"
-        app:fabSize="mini"
-        android:visibility="gone"
-        android:contentDescription="Pilih Jenis Permukaan" />
-
-    <!-- Tombol toggle chart -->
+    <!-- LEFT SIDE — Mini FABs (survey mode) -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabToggleChart"
         android:layout_width="wrap_content"
@@ -205,7 +285,107 @@
         android:layout_gravity="bottom|start"
         android:layout_margin="16dp"
         android:src="@drawable/ic_chart"
-        app:backgroundTint="@color/primary"
-        android:contentDescription="Toggle Chart" />
+        android:visibility="gone"
+        app:backgroundTint="@color/primary_dark"
+        app:tint="@color/white"
+        app:fabSize="mini"
+        app:elevation="6dp" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabCamera"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="80dp"
+        android:src="@drawable/ic_camera"
+        android:visibility="gone"
+        app:backgroundTint="@color/primary_dark"
+        app:tint="@color/white"
+        app:fabSize="mini"
+        app:elevation="6dp" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabVoice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="144dp"
+        android:src="@drawable/ic_mic"
+        android:visibility="gone"
+        app:backgroundTint="@color/primary_dark"
+        app:tint="@color/white"
+        app:fabSize="mini"
+        app:elevation="6dp" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabCondition"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="208dp"
+        android:src="@drawable/ic_condition"
+        android:visibility="gone"
+        app:backgroundTint="@color/primary_dark"
+        app:tint="@color/white"
+        app:fabSize="mini"
+        app:elevation="6dp" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabSurface"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="272dp"
+        android:src="@drawable/ic_surface"
+        android:visibility="gone"
+        app:backgroundTint="@color/primary_dark"
+        app:tint="@color/white"
+        app:fabSize="mini"
+        app:elevation="6dp" />
+
+    <!-- Voice Recording Indicator -->
+    <LinearLayout
+        android:id="@+id/voiceRecordingIndicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="64dp"
+        android:background="@color/primary_dark"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp"
+        android:visibility="gone">
+
+        <View
+            android:id="@+id/tvRecordingDot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@color/red_light"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/tvRecordingTimer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="00:00"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnStopMapRecording"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/stop"
+            android:textSize="12sp"
+            android:layout_marginStart="12dp"
+            android:textColor="@color/white"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
+    </LinearLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

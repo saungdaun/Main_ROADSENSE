@@ -14,7 +14,21 @@ import dagger.hilt.android.AndroidEntryPoint
 import zaujaani.roadsensebasic.R
 import zaujaani.roadsensebasic.data.local.entity.SurveySession
 import zaujaani.roadsensebasic.databinding.FragmentSummaryBinding
+import zaujaani.roadsensebasic.util.Constants
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
+/**
+ * Fragment daftar sesi survey dan ringkasan detail.
+ *
+ * Menampilkan:
+ * - Daftar semua sesi survey (tanggal, jarak, jumlah segmen)
+ * - Detail sesi: distribusi kondisi jalan (Baik/Sedang/Rusak Ringan/Rusak Berat)
+ * - Distribusi jenis permukaan (Aspal/Beton/dll)
+ * - Info surveyor, perangkat, durasi
+ * - Ekspor ke GPX / CSV
+ */
 @AndroidEntryPoint
 class SummaryFragment : Fragment() {
 
@@ -22,7 +36,6 @@ class SummaryFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val viewModel: SummaryViewModel by viewModels()
-
     private lateinit var adapter: SessionAdapter
 
     override fun onCreateView(
@@ -52,10 +65,10 @@ class SummaryFragment : Fragment() {
     private fun setupRecyclerView() {
         adapter = SessionAdapter(
             onItemClick = { item ->
-                showSessionOptions(item.session)
+                showSessionDetail(item.session.id)
             },
             onDetailClick = { item ->
-                Toast.makeText(requireContext(), getString(R.string.detail_coming_soon, item.session.id), Toast.LENGTH_SHORT).show()
+                showSessionOptions(item.session)
             }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -72,34 +85,126 @@ class SummaryFragment : Fragment() {
         viewModel.sessions.observe(viewLifecycleOwner) { sessions ->
             adapter.submitList(sessions)
             binding.tvEmpty.visibility = if (sessions.isEmpty()) View.VISIBLE else View.GONE
+            binding.recyclerView.visibility = if (sessions.isEmpty()) View.GONE else View.VISIBLE
             binding.swipeRefresh.isRefreshing = false
         }
 
-        // Parameter isLoading tidak digunakan, tapi kita bisa mengabaikan dengan aman
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
-            // Tidak perlu melakukan apa-apa, swipe refresh sudah menangani loading state
+            if (!isLoading) binding.swipeRefresh.isRefreshing = false
         }
+
+        viewModel.sessionDetail.observe(viewLifecycleOwner) { detail ->
+            detail ?: return@observe
+            showSessionDetailDialog(detail)
+        }
+    }
+
+    private fun showSessionDetail(sessionId: Long) {
+        viewModel.loadSessionDetail(sessionId)
+    }
+
+    private fun showSessionDetailDialog(detail: SessionDetailUi) {
+        val sb = StringBuilder()
+        val dateFormat = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault())
+
+        // Header info
+        sb.appendLine(getString(R.string.detail_date, dateFormat.format(Date(detail.session.startTime))))
+        sb.appendLine(getString(R.string.detail_device, detail.session.deviceModel))
+        if (detail.session.surveyorName.isNotBlank()) {
+            sb.appendLine(getString(R.string.detail_surveyor, detail.session.surveyorName))
+        }
+
+
+        // GPS info
+        val totalDistText = if (detail.totalDistance < 1000) {
+            getString(R.string.distance_m_format, detail.totalDistance.toInt())
+        } else {
+            getString(R.string.distance_km_format, detail.totalDistance / 1000.0)
+        }
+        sb.appendLine(getString(R.string.detail_total_distance, totalDistText))
+        sb.appendLine(getString(R.string.detail_duration, detail.durationMinutes))
+        sb.appendLine(getString(R.string.detail_segment_count, detail.segments.size))
+        sb.appendLine(getString(R.string.detail_avg_confidence, detail.avgConfidence))
+        sb.appendLine(getString(R.string.detail_photos, detail.photoCount))
+        sb.appendLine(getString(R.string.detail_audios, detail.audioCount))
+        sb.appendLine()
+
+        // Distribusi kondisi jalan
+        sb.appendLine(getString(R.string.detail_condition_header))
+        val conditions = listOf(
+            Constants.CONDITION_BAIK,
+            Constants.CONDITION_SEDANG,
+            Constants.CONDITION_RUSAK_RINGAN,
+            Constants.CONDITION_RUSAK_BERAT
+        )
+        conditions.forEach { cond ->
+            val length = detail.conditionDistribution[cond] ?: 0.0
+            if (length > 0) {
+                val pct = if (detail.totalDistance > 0) (length / detail.totalDistance * 100).toInt() else 0
+                val lengthText = if (length < 1000) {
+                    getString(R.string.distance_m_format, length.toInt())
+                } else {
+                    getString(R.string.distance_km_format, length / 1000.0)
+                }
+                sb.appendLine("  $cond: $lengthText ($pct%)")
+            }
+        }
+        sb.appendLine()
+
+        // Distribusi permukaan
+        if (detail.surfaceDistribution.isNotEmpty()) {
+            sb.appendLine(getString(R.string.detail_surface_header))
+            detail.surfaceDistribution.forEach { (surface, length) ->
+                val pct = if (detail.totalDistance > 0) (length / detail.totalDistance * 100).toInt() else 0
+                val lengthText = if (length < 1000) {
+                    getString(R.string.distance_m_format, length.toInt())
+                } else {
+                    getString(R.string.distance_km_format, length / 1000.0)
+                }
+                sb.appendLine("  $surface: $lengthText ($pct%)")
+            }
+        }
+
+        // Detail per segmen
+        if (detail.segments.isNotEmpty()) {
+            sb.appendLine()
+            sb.appendLine(getString(R.string.detail_segments_header))
+            detail.segments.forEachIndexed { i, seg ->
+                val len = (seg.endDistance - seg.startDistance).toInt()
+                sb.appendLine("  ${i+1}. ${seg.name.ifBlank { getString(R.string.no_name) }}")
+                sb.appendLine("     ${seg.conditionAuto} | ${seg.surfaceType} | ${len}m")
+                if (seg.notes.isNotBlank()) sb.appendLine("     📝 ${seg.notes}")
+            }
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.detail_title))
+            .setMessage(sb.toString())
+            .setPositiveButton(getString(R.string.export_gpx)) { _, _ ->
+                exportSession(detail.session, "gpx")
+            }
+            .setNeutralButton(getString(R.string.export_csv)) { _, _ ->
+                exportSession(detail.session, "csv")
+            }
+            .setNegativeButton(getString(R.string.ok), null)
+            .show()
     }
 
     private fun showSessionOptions(session: SurveySession) {
         val items = arrayOf(
             getString(R.string.view_details),
-            getString(R.string.delete),
-            getString(R.string.export_gpx)
+            getString(R.string.export_gpx),
+            getString(R.string.export_csv),
+            getString(R.string.delete)
         )
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.session_options))
             .setItems(items) { _, which ->
                 when (which) {
-                    0 -> {
-                        Toast.makeText(requireContext(), getString(R.string.detail_coming_soon, session.id), Toast.LENGTH_SHORT).show()
-                    }
-                    1 -> {
-                        confirmDelete(session)
-                    }
-                    2 -> {
-                        exportSession(session)
-                    }
+                    0 -> showSessionDetail(session.id)
+                    1 -> exportSession(session, "gpx")
+                    2 -> exportSession(session, "csv")
+                    3 -> confirmDelete(session)
                 }
             }
             .show()
@@ -116,16 +221,29 @@ class SummaryFragment : Fragment() {
             .show()
     }
 
-    private fun exportSession(session: SurveySession) {
-        viewModel.exportSessionToGpx(session.id) { file ->
-            if (file != null) {
-                MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(getString(R.string.export_success))
-                    .setMessage(getString(R.string.export_success_message, file.absolutePath))
-                    .setPositiveButton(getString(R.string.ok), null)
-                    .show()
-            } else {
-                Toast.makeText(requireContext(), R.string.export_failed, Toast.LENGTH_SHORT).show()
+    private fun exportSession(session: SurveySession, format: String) {
+        when (format) {
+            "gpx" -> viewModel.exportSessionToGpx(session.id) { file ->
+                if (file != null) {
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(getString(R.string.export_success))
+                        .setMessage(getString(R.string.export_success_message, file.absolutePath))
+                        .setPositiveButton(getString(R.string.ok), null)
+                        .show()
+                } else {
+                    Toast.makeText(requireContext(), R.string.export_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+            "csv" -> viewModel.exportSessionToCsv(session.id) { file ->
+                if (file != null) {
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(getString(R.string.export_success))
+                        .setMessage(getString(R.string.export_success_message, file.absolutePath))
+                        .setPositiveButton(getString(R.string.ok), null)
+                        .show()
+                } else {
+                    Toast.makeText(requireContext(), R.string.export_failed, Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

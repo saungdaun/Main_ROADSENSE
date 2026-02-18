@@ -1,15 +1,69 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# =========================
+# Gradle
+# =========================
+.gradle/
+build/
+**/build/
+
+# Local configuration
 local.properties
+
+# =========================
+# IDE
+# =========================
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Android Studio navigation editor temp files
+.navigation/
+
+# =========================
+# Log & temp
+# =========================
+*.log
+*.tmp
+*.temp
+*.swp
+
+# =========================
+# Keystore & signing
+# =========================
+*.jks
+*.keystore
+keystore.properties
+
+# =========================
+# Generated files
+# =========================
+captures/
+.externalNativeBuild/
+.cxx/
+
+# =========================
+# Room schema (optional)
+# =========================
+# Kalau mau versioning schema → hapus baris ini
+# app/schemas/
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Kotlin
+# =========================
+.kotlin/
+
+# =========================
+# Google Services (kalau ada)
+# =========================
+google-services.json
+
+# =========================
+# Secrets
+# =========================
+*.env
