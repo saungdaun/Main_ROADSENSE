@@ -26,7 +26,6 @@ import javax.inject.Singleton
 
 /**
  * Engine utama survey jalan.
- * Mengelola state survey, telemetri, dan pencatatan event.
  * Singleton agar state tetap ada saat fragment berganti.
  */
 @Singleton
@@ -37,7 +36,6 @@ class SurveyEngine @Inject constructor(
     private val vibrationAnalyzer: VibrationAnalyzer,
     private val confidenceCalculator: ConfidenceCalculator
 ) {
-    // Scope terpisah agar tidak tergantung lifecycle
     private val engineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private var currentSessionId: Long? = null
@@ -47,11 +45,12 @@ class SurveyEngine @Inject constructor(
     private val telemetryBuffer = mutableListOf<TelemetryRaw>()
     private var lastSaveTime = System.currentTimeMillis()
 
-    // State nilai terkini untuk kondisi dan permukaan (akan digunakan untuk telemetri)
     private var currentCondition: Condition = Condition.BAIK
     private var currentSurface: Surface = Surface.ASPAL
 
-    // StateFlows yang bisa diobservasi
+    // ── StateFlows ─────────────────────────────────────────────────────────────
+
+    /** Jarak kumulatif survey (meter). Diobservasi langsung oleh ViewModel/UI. */
     private val _currentDistance = MutableStateFlow(0.0)
     val currentDistance: StateFlow<Double> = _currentDistance.asStateFlow()
 
@@ -61,19 +60,19 @@ class SurveyEngine @Inject constructor(
     private val _isPaused = MutableStateFlow(false)
     val isPaused: StateFlow<Boolean> = _isPaused.asStateFlow()
 
-    // Vibration realtime
     private val _currentVibration = MutableStateFlow(0f)
     val currentVibration: StateFlow<Float> = _currentVibration.asStateFlow()
 
-    // Riwayat vibration untuk chart (hanya Z)
     private val _vibrationHistory = MutableStateFlow<List<Float>>(emptyList())
     val vibrationHistory: StateFlow<List<Float>> = _vibrationHistory.asStateFlow()
 
-    // Trigger jarak (misal setiap 100m) untuk notifikasi
     private val _distanceTrigger = MutableSharedFlow<Double>(extraBufferCapacity = 5)
     val distanceTrigger = _distanceTrigger.asSharedFlow()
 
-    // ========== STATE ACCESSORS ==========
+    private val _roadName = MutableStateFlow("")
+    val roadName: StateFlow<String> = _roadName.asStateFlow()
+
+    // ── Accessors ──────────────────────────────────────────────────────────────
 
     fun getCurrentSessionId(): Long? = currentSessionId
     fun getCurrentDistance(): Double = currentDistanceValue
@@ -81,9 +80,10 @@ class SurveyEngine @Inject constructor(
     fun getCurrentCondition(): Condition = currentCondition
     fun getCurrentSurface(): Surface = currentSurface
 
-    // ========== SESSION MANAGEMENT ==========
+    // ── Session Management ─────────────────────────────────────────────────────
 
     suspend fun startNewSession(surveyorName: String = "", roadName: String = ""): Long {
+        _roadName.value = roadName
         val firstLoc = lastLocation
         val session = SurveySession(
             startTime = System.currentTimeMillis(),
@@ -96,13 +96,16 @@ class SurveyEngine @Inject constructor(
         val id = surveyRepository.insertSession(session)
         currentSessionId = id
         isActive = true
-        _isPaused.value = false
         currentDistanceValue = 0.0
         _currentDistance.value = 0.0
         _isSurveying.value = true
+        _isPaused.value = false
         _vibrationHistory.value = emptyList()
         lastLocation = null
         telemetryBuffer.clear()
+        lastSaveTime = System.currentTimeMillis()
+        currentCondition = Condition.BAIK
+        currentSurface = Surface.ASPAL
         return id
     }
 
@@ -113,22 +116,24 @@ class SurveyEngine @Inject constructor(
         val session = surveyRepository.getSessionById(sessionId)
         if (session != null) {
             val lastLoc = lastLocation
-            val updatedSession = session.copy(
-                endTime = System.currentTimeMillis(),
-                totalDistance = currentDistanceValue,
-                endLat = lastLoc?.latitude ?: session.startLat,
-                endLng = lastLoc?.longitude ?: session.startLng,
-                avgConfidence = 0 // dapat dihitung nanti jika diperlukan
+            surveyRepository.updateSession(
+                session.copy(
+                    endTime = System.currentTimeMillis(),
+                    totalDistance = currentDistanceValue,
+                    endLat = lastLoc?.latitude ?: session.startLat,
+                    endLng = lastLoc?.longitude ?: session.startLng,
+                    avgConfidence = 0
+                )
             )
-            surveyRepository.updateSession(updatedSession)
         }
-        isActive = false
-        _isSurveying.value = false
-        _isPaused.value = false
-        currentSessionId = null
+        resetState()
     }
 
     fun discardCurrentSession() {
+        resetState()
+    }
+
+    private fun resetState() {
         isActive = false
         currentSessionId = null
         currentDistanceValue = 0.0
@@ -138,6 +143,7 @@ class SurveyEngine @Inject constructor(
         lastLocation = null
         telemetryBuffer.clear()
         _vibrationHistory.value = emptyList()
+        _currentVibration.value = 0f
     }
 
     fun pauseSurvey() {
@@ -150,11 +156,12 @@ class SurveyEngine @Inject constructor(
         _isPaused.value = false
     }
 
-    // ========== LOCATION UPDATE ==========
+    // ── Location Update ────────────────────────────────────────────────────────
 
     fun updateLocation(location: Location) {
         if (!isActive || _isPaused.value) return
 
+        // Hitung jarak dari lokasi sebelumnya
         lastLocation?.let { last ->
             val results = FloatArray(1)
             Location.distanceBetween(
@@ -162,10 +169,11 @@ class SurveyEngine @Inject constructor(
                 location.latitude, location.longitude,
                 results
             )
-            // Filter noise: hanya update jika bergerak > 0.5m dan akurasi < 25m
-            if (results[0] > 0.5f && location.accuracy < Constants.GPS_ACCURACY_THRESHOLD) {
+            val delta = results[0]
+            // Filter noise: hanya update jika bergerak > 0.5m dan akurasi cukup baik
+            if (delta > 0.5f && location.accuracy < Constants.GPS_ACCURACY_THRESHOLD) {
                 val previousDistance = currentDistanceValue
-                currentDistanceValue += results[0]
+                currentDistanceValue += delta
                 _currentDistance.value = currentDistanceValue
 
                 // Trigger setiap kelipatan 100m
@@ -180,24 +188,24 @@ class SurveyEngine @Inject constructor(
         }
         lastLocation = location
 
-        // Ambil nilai getaran dari gateway
+        // Baca sensor terkini
         val vibrationZ = sensorGateway.getLatestVibration()
         val vibrationX = sensorGateway.axisX.value
         val vibrationY = sensorGateway.axisY.value
 
         _currentVibration.value = vibrationZ
 
-        // Update chart history
-        val currentList = _vibrationHistory.value.toMutableList()
-        currentList.add(vibrationZ)
-        if (currentList.size > Constants.VIBRATION_HISTORY_MAX) {
-            currentList.removeAt(0)
+        // Update chart history (bounded list)
+        val updatedHistory = _vibrationHistory.value.toMutableList().also {
+            it.add(vibrationZ)
+            if (it.size > Constants.VIBRATION_HISTORY_MAX) it.removeAt(0)
         }
-        _vibrationHistory.value = currentList
+        _vibrationHistory.value = updatedHistory
 
-        // Buat telemetri dengan data lengkap
+        // Simpan telemetri ke buffer
+        val sessionId = currentSessionId ?: return
         val telemetry = TelemetryRaw(
-            sessionId = currentSessionId ?: return,
+            sessionId = sessionId,
             timestamp = Instant.now(),
             latitude = location.latitude,
             longitude = location.longitude,
@@ -208,13 +216,15 @@ class SurveyEngine @Inject constructor(
             vibrationZ = vibrationZ,
             gpsAccuracy = location.accuracy,
             cumulativeDistance = currentDistanceValue,
-            condition = currentCondition,      // enum Condition
-            surface = currentSurface           // enum Surface
+            condition = currentCondition,
+            surface = currentSurface
         )
         telemetryBuffer.add(telemetry)
 
         val now = System.currentTimeMillis()
-        if (telemetryBuffer.size >= Constants.TELEMETRY_BUFFER_SIZE || now - lastSaveTime > Constants.TELEMETRY_FLUSH_INTERVAL) {
+        if (telemetryBuffer.size >= Constants.TELEMETRY_BUFFER_SIZE ||
+            now - lastSaveTime > Constants.TELEMETRY_FLUSH_INTERVAL
+        ) {
             flushTelemetry()
             lastSaveTime = now
         }
@@ -227,9 +237,11 @@ class SurveyEngine @Inject constructor(
         engineScope.launch {
             try {
                 telemetryRepository.insertAll(snapshot)
-            } catch (_: Exception) {
-                // Kembalikan ke buffer jika gagal (sederhana)
-                telemetryBuffer.addAll(0, snapshot)
+            } catch (e: Exception) {
+                // Kembalikan ke buffer jika gagal
+                synchronized(telemetryBuffer) {
+                    telemetryBuffer.addAll(0, snapshot)
+                }
             }
         }
     }
@@ -240,70 +252,31 @@ class SurveyEngine @Inject constructor(
         telemetryBuffer.clear()
         try {
             telemetryRepository.insertAll(snapshot)
-        } catch (_: Exception) {
-            // Diabaikan saat stop
-        }
+        } catch (_: Exception) { /* diabaikan saat stop */ }
     }
 
-    // ========== EVENT RECORDING ==========
+    // ── Event Recording ────────────────────────────────────────────────────────
 
     fun recordConditionChange(condition: Condition) {
         currentCondition = condition
-        val location = lastLocation ?: return
-        val sessionId = currentSessionId ?: return
-        val event = RoadEvent(
-            sessionId = sessionId,
-            timestamp = System.currentTimeMillis(),
-            latitude = location.latitude,
-            longitude = location.longitude,
-            distance = currentDistanceValue.toFloat(),
-            eventType = EventType.CONDITION_CHANGE,
-            value = condition.name,
-            notes = null
-        )
-        engineScope.launch {
-            surveyRepository.insertEvent(event)
-        }
+        recordEvent(EventType.CONDITION_CHANGE, condition.name)
     }
 
     fun recordSurfaceChange(surface: Surface) {
         currentSurface = surface
-        val location = lastLocation ?: return
-        val sessionId = currentSessionId ?: return
-        val event = RoadEvent(
-            sessionId = sessionId,
-            timestamp = System.currentTimeMillis(),
-            latitude = location.latitude,
-            longitude = location.longitude,
-            distance = currentDistanceValue.toFloat(),
-            eventType = EventType.SURFACE_CHANGE,
-            value = surface.name,
-            notes = null
-        )
-        engineScope.launch {
-            surveyRepository.insertEvent(event)
-        }
+        recordEvent(EventType.SURFACE_CHANGE, surface.name)
     }
 
     fun recordPhoto(path: String, notes: String? = null) {
-        val location = lastLocation ?: return
-        val sessionId = currentSessionId ?: return
-        val event = RoadEvent(
-            sessionId = sessionId,
-            timestamp = System.currentTimeMillis(),
-            latitude = location.latitude,
-            longitude = location.longitude,
-            distance = currentDistanceValue.toFloat(),
-            eventType = EventType.PHOTO,
-            value = path,
-            notes = notes
-        )
-        engineScope.launch {
-            surveyRepository.insertEvent(event)
-        }
+        recordEvent(EventType.PHOTO, path, notes)
     }
 
     fun recordVoice(path: String, notes: String? = null) {
+        recordEvent(EventType.VOICE, path, notes)
+    }
+
+    /** Helper untuk menghindari duplikasi kode event recording */
+    private fun recordEvent(type: EventType, value: String, notes: String? = null) {
         val location = lastLocation ?: return
         val sessionId = currentSessionId ?: return
         val event = RoadEvent(
@@ -312,32 +285,24 @@ class SurveyEngine @Inject constructor(
             latitude = location.latitude,
             longitude = location.longitude,
             distance = currentDistanceValue.toFloat(),
-            eventType = EventType.VOICE,
-            value = path,
+            eventType = type,
+            value = value,
             notes = notes
         )
-        engineScope.launch {
-            surveyRepository.insertEvent(event)
-        }
+        engineScope.launch { surveyRepository.insertEvent(event) }
     }
 
-    // ========== UTILITY ==========
+    // ── Utility ────────────────────────────────────────────────────────────────
 
     fun checkConditionConsistency(selectedCondition: Condition): Boolean {
-        // Bandingkan dengan getaran terkini, return true jika konsisten, false jika bertolak belakang
         val vib = _currentVibration.value
         return when (selectedCondition) {
-            Condition.BAIK -> vib < Constants.DEFAULT_THRESHOLD_BAIK * 1.2
-            Condition.SEDANG -> vib in (Constants.DEFAULT_THRESHOLD_BAIK * 0.8)..(Constants.DEFAULT_THRESHOLD_SEDANG * 1.2)
-            Condition.RUSAK_RINGAN -> vib in (Constants.DEFAULT_THRESHOLD_SEDANG * 0.8)..(Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN * 1.2)
-            Condition.RUSAK_BERAT -> vib > Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN * 0.8
+            Condition.BAIK -> vib < Constants.DEFAULT_THRESHOLD_BAIK * 1.2f
+            Condition.SEDANG -> vib in
+                    (Constants.DEFAULT_THRESHOLD_BAIK * 0.8f)..(Constants.DEFAULT_THRESHOLD_SEDANG * 1.2f)
+            Condition.RUSAK_RINGAN -> vib in
+                    (Constants.DEFAULT_THRESHOLD_SEDANG * 0.8f)..(Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN * 1.2f)
+            Condition.RUSAK_BERAT -> vib > Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN * 0.8f
         }
-    }
-
-    private fun classifyCondition(avgVibration: Double): Condition = when {
-        avgVibration < Constants.DEFAULT_THRESHOLD_BAIK -> Condition.BAIK
-        avgVibration < Constants.DEFAULT_THRESHOLD_SEDANG -> Condition.SEDANG
-        avgVibration < Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN -> Condition.RUSAK_RINGAN
-        else -> Condition.RUSAK_BERAT
     }
 }

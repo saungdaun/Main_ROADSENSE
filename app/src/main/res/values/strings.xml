@@ -180,4 +180,25 @@
     <string name="disconnected">Terputus</string>
     <string name="error">Error</string>
     <string name="select_device">Pilih Perangkat</string>
+
+    <string name="view_photos">Lihat Foto</string>
+    <string name="no_photos">Tidak ada foto</string>
+    <string name="photo_file_not_found">File foto tidak ditemukan</string>
+    <string name="photo_preview_title">Preview Foto</string>
+    <string name="previous">Sebelumnya</string>
+    <string name="next">Berikutnya</string>
+    <string name="close">Tutup</string>
+
+    <string name="watermark_app_name">RoadSense SaungDaun</string>
+    <string name="watermark_distance">Jarak: %d m</string>
+    <string name="watermark_coord">Lat: %s, Lon: %s</string>
+
+    <!-- Baru - tambahkan di strings.xml -->
+    <string name="condition_rusak_berat">Rusak Berat</string>
+    <string name="audio_saved">Rekaman tersimpan</string>
+    <string name="timer_default">00:00</string>
+    <string name="warning_title">Peringatan</string>
+    <string name="condition_mismatch_message">Data getaran menunjukkan kondisi berbeda. Yakin memilih %s?</string>
+    <string name="surveyor_name_required">Nama surveyor wajib diisi</string>
+    <string name="distance_reached_prompt">Jarak %d m tercapai. Ambil foto?</string>
 </resources>

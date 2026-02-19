@@ -1,19 +1,27 @@
 package zaujaani.roadsensebasic.ui.summary
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import timber.log.Timber
 import zaujaani.roadsensebasic.R
 import zaujaani.roadsensebasic.data.local.entity.EventType
 import zaujaani.roadsensebasic.data.local.entity.RoadEvent
@@ -45,12 +53,15 @@ class SummaryFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupToolbar()
         setupRecyclerView()
         setupSwipeRefresh()
         observeViewModel()
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Setup
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun setupToolbar() {
         binding.toolbar.setNavigationOnClickListener {
@@ -60,12 +71,8 @@ class SummaryFragment : Fragment() {
 
     private fun setupRecyclerView() {
         adapter = SessionAdapter(
-            onItemClick = { item ->
-                showSessionDetail(item.session.id)
-            },
-            onDetailClick = { item ->
-                showSessionOptions(item.session)
-            }
+            onItemClick = { item -> showSessionDetail(item.session.id) },
+            onDetailClick = { item -> showSessionOptions(item.session) }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
@@ -76,6 +83,10 @@ class SummaryFragment : Fragment() {
             viewModel.loadSessions()
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Observers
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun observeViewModel() {
         viewModel.sessions.observe(viewLifecycleOwner) { sessions ->
@@ -95,6 +106,10 @@ class SummaryFragment : Fragment() {
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Session Detail Dialog
+    // ─────────────────────────────────────────────────────────────────────────
+
     private fun showSessionDetail(sessionId: Long) {
         viewModel.loadSessionDetail(sessionId)
     }
@@ -104,21 +119,18 @@ class SummaryFragment : Fragment() {
         val dateFormat = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault())
 
         // Header info
-        sb.appendLine(getString(R.string.detail_date, dateFormat.format(Date(detail.session.startTime))))
-        sb.appendLine(getString(R.string.detail_device, detail.session.deviceModel))
+        sb.appendLine(getString(R.string.detail_date,
+            dateFormat.format(Date(detail.session.startTime))))
         if (detail.session.surveyorName.isNotBlank()) {
             sb.appendLine(getString(R.string.detail_surveyor, detail.session.surveyorName))
         }
+        sb.appendLine(getString(R.string.detail_device, detail.session.deviceModel))
         if (detail.session.roadName.isNotBlank()) {
             sb.appendLine("🛣 ${detail.session.roadName}")
         }
 
-        // GPS info
-        val totalDistText = if (detail.totalDistance < 1000) {
-            getString(R.string.distance_m_format, detail.totalDistance.toInt())
-        } else {
-            getString(R.string.distance_km_format, detail.totalDistance / 1000.0)
-        }
+        // Statistik
+        val totalDistText = formatDistance(detail.totalDistance)
         sb.appendLine(getString(R.string.detail_total_distance, totalDistText))
         sb.appendLine(getString(R.string.detail_duration, detail.durationMinutes))
         sb.appendLine(getString(R.string.detail_avg_confidence, detail.avgConfidence))
@@ -128,22 +140,17 @@ class SummaryFragment : Fragment() {
 
         // Distribusi kondisi jalan
         sb.appendLine(getString(R.string.detail_condition_header))
-        val conditions = listOf(
+        listOf(
             Constants.CONDITION_BAIK,
             Constants.CONDITION_SEDANG,
             Constants.CONDITION_RUSAK_RINGAN,
             Constants.CONDITION_RUSAK_BERAT
-        )
-        conditions.forEach { cond ->
+        ).forEach { cond ->
             val length = detail.conditionDistribution[cond] ?: 0.0
             if (length > 0) {
-                val pct = if (detail.totalDistance > 0) (length / detail.totalDistance * 100).toInt() else 0
-                val lengthText = if (length < 1000) {
-                    getString(R.string.distance_m_format, length.toInt())
-                } else {
-                    getString(R.string.distance_km_format, length / 1000.0)
-                }
-                sb.appendLine("  $cond: $lengthText ($pct%)")
+                val pct = if (detail.totalDistance > 0)
+                    (length / detail.totalDistance * 100).toInt() else 0
+                sb.appendLine("  $cond: ${formatDistance(length)} ($pct%)")
             }
         }
         sb.appendLine()
@@ -152,94 +159,57 @@ class SummaryFragment : Fragment() {
         if (detail.surfaceDistribution.isNotEmpty()) {
             sb.appendLine(getString(R.string.detail_surface_header))
             detail.surfaceDistribution.forEach { (surface, length) ->
-                val pct = if (detail.totalDistance > 0) (length / detail.totalDistance * 100).toInt() else 0
-                val lengthText = if (length < 1000) {
-                    getString(R.string.distance_m_format, length.toInt())
-                } else {
-                    getString(R.string.distance_km_format, length / 1000.0)
-                }
-                sb.appendLine("  $surface: $lengthText ($pct%)")
+                val pct = if (detail.totalDistance > 0)
+                    (length / detail.totalDistance * 100).toInt() else 0
+                sb.appendLine("  $surface: ${formatDistance(length)} ($pct%)")
             }
+            sb.appendLine()
         }
 
-        // Detail per event (foto, voice, perubahan kondisi/permukaan)
+        // Titik penting (events)
         if (detail.events.isNotEmpty()) {
-            sb.appendLine()
             sb.appendLine("📌 Titik Penting:")
             detail.events.forEach { event ->
                 val sta = event.distance.toInt()
-                val staStr = "STA ${sta/100}+${sta%100}"
-                val type = when (event.eventType) {
+                val staStr = "STA ${sta / 100}+${String.format(Locale.getDefault(), "%02d", sta % 100)}"
+                val typeStr = when (event.eventType) {
                     EventType.CONDITION_CHANGE -> "🔵 Kondisi: ${event.value}"
-                    EventType.SURFACE_CHANGE -> "🟢 Permukaan: ${event.value}"
-                    EventType.PHOTO -> "📷 Foto"
-                    EventType.VOICE -> "🎤 Rekaman"
+                    EventType.SURFACE_CHANGE   -> "🟢 Permukaan: ${event.value}"
+                    EventType.PHOTO            -> "📷 Foto"
+                    EventType.VOICE            -> "🎤 Rekaman"
                 }
-                sb.appendLine("  $staStr - $type")
+                sb.appendLine("  $staStr — $typeStr")
                 if (!event.notes.isNullOrBlank()) {
                     sb.appendLine("     📝 ${event.notes}")
                 }
             }
         }
 
-        // Buat dialog dengan tombol Lihat Foto
+        val photoEvents = detail.events.filter { it.eventType == EventType.PHOTO }
+
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.detail_title))
             .setMessage(sb.toString())
             .setPositiveButton(getString(R.string.export_gpx)) { _, _ ->
                 exportSession(detail.session, "gpx")
             }
-            .setNeutralButton("Lihat Foto") { _, _ ->
-                showPhotoListDialog(detail.events)
+            .setNeutralButton(getString(R.string.export_csv)) { _, _ ->
+                exportSession(detail.session, "csv")
             }
-            .setNegativeButton(getString(R.string.ok), null)
-            .show()
-    }
-
-    private fun showPhotoListDialog(events: List<RoadEvent>) {
-        val photoEvents = events.filter { it.eventType == EventType.PHOTO }
-        if (photoEvents.isEmpty()) {
-            Toast.makeText(requireContext(), "Tidak ada foto", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val items = photoEvents.map { event ->
-            val sta = event.distance.toInt()
-            val staStr = "STA ${sta/100}+${sta%100}  ${event.value.substringAfterLast('/')}"
-            staStr
-        }.toTypedArray()
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Daftar Foto")
-            .setItems(items) { _, which ->
-                val selectedEvent = photoEvents[which]
-                showPhotoPreview(selectedEvent.value)
+            .setNegativeButton(getString(R.string.view_photos)) { _, _ ->
+                if (photoEvents.isNotEmpty()) {
+                    showPhotoSlider(photoEvents, 0)
+                } else {
+                    Toast.makeText(requireContext(),
+                        getString(R.string.no_photos), Toast.LENGTH_SHORT).show()
+                }
             }
-            .setNegativeButton("Tutup", null)
             .show()
     }
 
-    private fun showPhotoPreview(photoPath: String) {
-        val file = File(photoPath)
-        if (!file.exists()) {
-            Toast.makeText(requireContext(), "File foto tidak ditemukan", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val bitmap = BitmapFactory.decodeFile(photoPath)
-        val imageView = ImageView(requireContext()).apply {
-            setImageBitmap(bitmap)
-            adjustViewBounds = true
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            setBackgroundColor(Color.BLACK)
-        }
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Preview Foto")
-            .setView(imageView)
-            .setPositiveButton("Tutup", null)
-            .show()
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Session Options & Delete
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun showSessionOptions(session: SurveySession) {
         val items = arrayOf(
@@ -272,30 +242,152 @@ class SummaryFragment : Fragment() {
             .show()
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Export
+    // ─────────────────────────────────────────────────────────────────────────
+
     private fun exportSession(session: SurveySession, format: String) {
         when (format) {
             "gpx" -> viewModel.exportSessionToGpx(session.id) { file ->
-                if (file != null) {
-                    MaterialAlertDialogBuilder(requireContext())
-                        .setTitle(getString(R.string.export_success))
-                        .setMessage(getString(R.string.export_success_message, file.absolutePath))
-                        .setPositiveButton(getString(R.string.ok), null)
-                        .show()
-                } else {
-                    Toast.makeText(requireContext(), R.string.export_failed, Toast.LENGTH_SHORT).show()
-                }
+                showExportResult(file)
             }
             "csv" -> viewModel.exportSessionToCsv(session.id) { file ->
-                if (file != null) {
-                    MaterialAlertDialogBuilder(requireContext())
-                        .setTitle(getString(R.string.export_success))
-                        .setMessage(getString(R.string.export_success_message, file.absolutePath))
-                        .setPositiveButton(getString(R.string.ok), null)
-                        .show()
-                } else {
-                    Toast.makeText(requireContext(), R.string.export_failed, Toast.LENGTH_SHORT).show()
+                showExportResult(file)
+            }
+        }
+    }
+
+    private fun showExportResult(file: File?) {
+        if (file != null) {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(getString(R.string.export_success))
+                .setMessage(getString(R.string.export_success_message, file.absolutePath))
+                .setPositiveButton(getString(R.string.ok), null)
+                .show()
+        } else {
+            Toast.makeText(requireContext(), R.string.export_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Photo Slider
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun showPhotoSlider(photos: List<RoadEvent>, startIndex: Int) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_photo_slider, null)
+        val imageView   = dialogView.findViewById<ImageView>(R.id.ivPhoto)
+        val tvCounter   = dialogView.findViewById<TextView>(R.id.tvCounter)
+        val btnPrev     = dialogView.findViewById<MaterialButton>(R.id.btnPrev)
+        val btnNext     = dialogView.findViewById<MaterialButton>(R.id.btnNext)
+        val progressBar = dialogView.findViewById<ProgressBar>(R.id.progressBar)
+
+        var currentIndex = startIndex
+        var currentBitmap: Bitmap? = null
+
+        fun loadPhoto(index: Int) {
+            val event = photos[index]
+            val file  = File(event.value)
+
+            // Update counter & STA
+            val sta = event.distance.toInt()
+            tvCounter.text = "${index + 1}/${photos.size} — STA ${sta / 100}+" +
+                    String.format(Locale.getDefault(), "%02d", sta % 100)
+
+            btnPrev.isEnabled = index > 0
+            btnNext.isEnabled = index < photos.size - 1
+
+            if (!file.exists()) {
+                imageView.setImageResource(android.R.drawable.ic_menu_report_image)
+                Toast.makeText(requireContext(),
+                    getString(R.string.photo_file_not_found), Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            // Load gambar di IO thread — hindari ANR & OOM
+            progressBar.visibility = View.VISIBLE
+            imageView.setImageDrawable(null)
+
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                val bitmap = try {
+                    decodeSampledBitmap(file.absolutePath, 900, 675)
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to decode photo: ${file.absolutePath}")
+                    null
+                }
+                withContext(Dispatchers.Main) {
+                    if (_binding == null) return@withContext // fragment sudah destroyed
+                    progressBar.visibility = View.GONE
+                    if (bitmap != null) {
+                        currentBitmap?.recycle()
+                        currentBitmap = bitmap
+                        imageView.setImageBitmap(bitmap)
+                    } else {
+                        imageView.setImageResource(android.R.drawable.ic_menu_report_image)
+                        Toast.makeText(requireContext(),
+                            getString(R.string.photo_failed), Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
+        }
+
+        btnPrev.setOnClickListener {
+            if (currentIndex > 0) { currentIndex--; loadPhoto(currentIndex) }
+        }
+        btnNext.setOnClickListener {
+            if (currentIndex < photos.size - 1) { currentIndex++; loadPhoto(currentIndex) }
+        }
+
+        loadPhoto(currentIndex)
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.photo_preview_title))
+            .setView(dialogView)
+            .setPositiveButton(getString(R.string.close)) { _, _ ->
+                currentBitmap?.recycle()
+                currentBitmap = null
+            }
+            .setOnDismissListener {
+                currentBitmap?.recycle()
+                currentBitmap = null
+            }
+            .show()
+    }
+
+    /**
+     * Decode bitmap dengan subsampling agar tidak OOM.
+     * Pass 1: baca dimensi saja. Pass 2: decode dengan inSampleSize.
+     */
+    private fun decodeSampledBitmap(path: String, reqWidth: Int, reqHeight: Int): Bitmap {
+        val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, boundsOpts)
+
+        var sampleSize = 1
+        val rawH = boundsOpts.outHeight
+        val rawW = boundsOpts.outWidth
+        if (rawH > reqHeight || rawW > reqWidth) {
+            val halfH = rawH / 2
+            val halfW = rawW / 2
+            while (halfH / sampleSize >= reqHeight && halfW / sampleSize >= reqWidth) {
+                sampleSize *= 2
+            }
+        }
+
+        return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            // RGB_565 hemat ~50% RAM dibanding ARGB_8888 — cukup untuk preview foto
+            inPreferredConfig = Bitmap.Config.RGB_565
+        })
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun formatDistance(meters: Double): String {
+        return if (meters < 1000) {
+            getString(R.string.distance_m_format, meters.toInt())
+        } else {
+            getString(R.string.distance_km_format, meters / 1000.0)
         }
     }
 

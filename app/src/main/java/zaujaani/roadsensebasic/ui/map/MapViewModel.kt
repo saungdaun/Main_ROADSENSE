@@ -24,7 +24,6 @@ import zaujaani.roadsensebasic.data.local.entity.Surface
 import zaujaani.roadsensebasic.data.repository.SurveyRepository
 import zaujaani.roadsensebasic.domain.engine.SurveyEngine
 import zaujaani.roadsensebasic.gateway.GPSGateway
-import zaujaani.roadsensebasic.gateway.SensorGateway
 import zaujaani.roadsensebasic.service.SurveyForegroundService
 import zaujaani.roadsensebasic.util.Constants
 import zaujaani.roadsensebasic.util.PreferencesManager
@@ -34,40 +33,45 @@ import javax.inject.Inject
 class MapViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val gpsGateway: GPSGateway,
-    private val sensorGateway: SensorGateway,
     private val surveyEngine: SurveyEngine,
     private val surveyRepository: SurveyRepository,
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
 
-    // ========== LOCATION & SENSOR UI STATE ==========
+    // ── Location & Sensor ─────────────────────────────────────────────────────
+
     private val _location = MutableStateFlow<Location?>(null)
     val location: StateFlow<Location?> = _location.asStateFlow()
 
     private val _speed = MutableStateFlow(0f)
     val speed: StateFlow<Float> = _speed.asStateFlow()
 
-    private val _gpsAccuracy = MutableStateFlow(0f)
-    val gpsAccuracy: StateFlow<Float> = _gpsAccuracy.asStateFlow()
-
-    private val _distance = MutableStateFlow(0.0)
-    val distance: StateFlow<Double> = _distance.asStateFlow()
+    /**
+     * Jarak kumulatif — langsung dari SurveyEngine (single source of truth).
+     * FIX: sebelumnya ViewModel punya _distance sendiri yang tidak pernah
+     * di-update dari engine, sehingga UI selalu menampilkan 0.
+     */
+    val distance: StateFlow<Double> = surveyEngine.currentDistance
 
     val vibration: StateFlow<Float> = surveyEngine.currentVibration
 
-    // ========== SURVEY STATE ==========
+    // ── Survey State ──────────────────────────────────────────────────────────
+
     val isSurveying: StateFlow<Boolean> = surveyEngine.isSurveying
     val isPaused: StateFlow<Boolean> = surveyEngine.isPaused
     val vibrationHistory: StateFlow<List<Float>> = surveyEngine.vibrationHistory
+    val roadName: StateFlow<String> = surveyEngine.roadName
 
-    // ========== CONDITION & SURFACE ==========
+    // ── Condition & Surface ───────────────────────────────────────────────────
+
     private val _currentCondition = MutableStateFlow(Condition.BAIK)
     val currentCondition: StateFlow<Condition> = _currentCondition.asStateFlow()
 
     private val _currentSurface = MutableStateFlow(Surface.ASPAL)
     val currentSurface: StateFlow<Surface> = _currentSurface.asStateFlow()
 
-    // ========== THRESHOLDS ==========
+    // ── Thresholds ────────────────────────────────────────────────────────────
+
     private val _thresholdBaik = MutableStateFlow(Constants.DEFAULT_THRESHOLD_BAIK)
     val thresholdBaik: StateFlow<Float> = _thresholdBaik.asStateFlow()
 
@@ -77,14 +81,23 @@ class MapViewModel @Inject constructor(
     private val _thresholdRusakRingan = MutableStateFlow(Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN)
     val thresholdRusakRingan: StateFlow<Float> = _thresholdRusakRingan.asStateFlow()
 
-    // ========== TRIGGER JARAK ==========
+    // ── Distance Trigger ──────────────────────────────────────────────────────
+
     private val _distanceTrigger = MutableSharedFlow<Double>(extraBufferCapacity = 5)
     val distanceTrigger = _distanceTrigger.asSharedFlow()
 
-    // ========== LOCATION TRACKING ==========
+    // ── Location Job ──────────────────────────────────────────────────────────
+
     private var locationTrackingJob: Job? = null
 
+    // ─────────────────────────────────────────────────────────────────────────
+
     init {
+        collectPreferences()
+        collectDistanceTrigger()
+    }
+
+    private fun collectPreferences() {
         viewModelScope.launch {
             preferencesManager.thresholdBaik.collect { _thresholdBaik.value = it }
         }
@@ -94,23 +107,27 @@ class MapViewModel @Inject constructor(
         viewModelScope.launch {
             preferencesManager.thresholdRusakRingan.collect { _thresholdRusakRingan.value = it }
         }
+    }
 
+    private fun collectDistanceTrigger() {
         viewModelScope.launch {
-            surveyEngine.distanceTrigger.collect { distance ->
-                _distanceTrigger.emit(distance)
+            surveyEngine.distanceTrigger.collect { dist ->
+                _distanceTrigger.emit(dist)
             }
         }
     }
 
-    // ========== LOCATION TRACKING ==========
+    // ── Location Tracking ─────────────────────────────────────────────────────
+
     fun startLocationTracking() {
         if (locationTrackingJob?.isActive == true) return
         locationTrackingJob = gpsGateway.getLocationFlow()
             .catch { e -> Timber.e(e, "Error in location flow") }
-            .onEach { location ->
-                _location.value = location
-                _speed.value = location.speed
-                _gpsAccuracy.value = location.accuracy
+            .onEach { loc ->
+                _location.value = loc
+                _speed.value = loc.speed
+                // FIX UTAMA: teruskan ke engine agar jarak & telemetri dihitung
+                surveyEngine.updateLocation(loc)
             }
             .launchIn(viewModelScope)
     }
@@ -120,11 +137,13 @@ class MapViewModel @Inject constructor(
         locationTrackingJob = null
     }
 
-    // ========== SURVEY LIFECYCLE ==========
-    fun startSurvey(surveyorName: String = "", roadName: String = "") {
+    // ── Survey Lifecycle ──────────────────────────────────────────────────────
+
+    fun startSurvey(surveyorName: String, roadName: String) {
         viewModelScope.launch {
             surveyEngine.startNewSession(surveyorName, roadName)
-            _distance.value = 0.0
+            _currentCondition.value = Condition.BAIK
+            _currentSurface.value = Surface.ASPAL
             startForegroundService()
         }
     }
@@ -143,23 +162,21 @@ class MapViewModel @Inject constructor(
         viewModelScope.launch {
             surveyEngine.endCurrentSession()
             stopForegroundService()
-            _distance.value = 0.0
         }
     }
 
     fun stopSurveyAndDiscard() {
         viewModelScope.launch {
-            val sessionId = surveyEngine.getCurrentSessionId()
-            if (sessionId != null) {
-                surveyRepository.deleteSessionById(sessionId)
+            surveyEngine.getCurrentSessionId()?.let { id ->
+                surveyRepository.deleteSessionById(id)
             }
             surveyEngine.discardCurrentSession()
             stopForegroundService()
-            _distance.value = 0.0
         }
     }
 
-    // ========== EVENT RECORDING ==========
+    // ── Event Recording ───────────────────────────────────────────────────────
+
     fun recordCondition(condition: Condition) {
         surveyEngine.recordConditionChange(condition)
         _currentCondition.value = condition
@@ -178,11 +195,13 @@ class MapViewModel @Inject constructor(
         surveyEngine.recordVoice(path, notes)
     }
 
-    // ========== VALIDASI KONSISTENSI ==========
+    // ── Validation ────────────────────────────────────────────────────────────
+
     fun checkConditionConsistency(condition: Condition): Boolean =
         surveyEngine.checkConditionConsistency(condition)
 
-    // ========== FOREGROUND SERVICE ==========
+    // ── Foreground Service ────────────────────────────────────────────────────
+
     private fun startForegroundService() {
         val intent = Intent(context, SurveyForegroundService::class.java).apply {
             action = Constants.ACTION_START
@@ -203,11 +222,12 @@ class MapViewModel @Inject constructor(
     }
 
     private fun sendServiceCommand(action: String) {
-        val intent = Intent(context, SurveyForegroundService::class.java).apply {
-            this.action = action
-        }
         try {
-            context.startService(intent)
+            context.startService(
+                Intent(context, SurveyForegroundService::class.java).apply {
+                    this.action = action
+                }
+            )
         } catch (e: Exception) {
             Timber.e(e, "Failed to send service command: $action")
         }

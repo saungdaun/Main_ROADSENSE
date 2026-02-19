@@ -3,11 +3,18 @@ package zaujaani.roadsensebasic.ui.map
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.location.Location
 import android.media.MediaRecorder
-import android.os.Bundle
+import android.media.MediaScannerConnection
+import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.view.LayoutInflater
@@ -30,14 +37,16 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.withContext
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -55,6 +64,7 @@ import zaujaani.roadsensebasic.gateway.SensorGateway
 import zaujaani.roadsensebasic.util.Constants
 import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -106,17 +116,48 @@ class MapFragment : Fragment() {
     private val colorDefault by lazy { ContextCompat.getColor(requireContext(), R.color.primary) }
 
     // ── Camera ─────────────────────────────────────────────────────────────────
-    private var currentPhotoUri: android.net.Uri? = null
+    private var currentPhotoPath: String? = null
+    private var currentPhotoUri: Uri? = null
 
     private val takePictureLauncher =
         registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             if (success && currentPhotoPath != null) {
-                Timber.d("Photo saved: $currentPhotoPath")
-                showToast(getString(R.string.photo_saved))
-                viewModel.recordPhoto(currentPhotoPath!!)
-                currentPhotoPath = null
+                val originalPath = currentPhotoPath!!
+
+                val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                val distance = viewModel.distance.value.toInt()
+                val location = viewModel.location.value
+                val lat = location?.latitude?.let { String.format(Locale.getDefault(), "%.6f", it) } ?: "N/A"
+                val lon = location?.longitude?.let { String.format(Locale.getDefault(), "%.6f", it) } ?: "N/A"
+                val roadName = viewModel.roadName.value
+
+                val textLines = buildList {
+                    add(getString(R.string.watermark_app_name))
+                    add(timestamp)
+                    add(getString(R.string.watermark_distance, distance))
+                    add(getString(R.string.watermark_coord, lat, lon))
+                    if (roadName.isNotBlank()) add(roadName)
+                }
+
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val processedPath = addWatermarkToImage(originalPath, textLines)
+                    withContext(Dispatchers.Main) {
+                        if (processedPath != null) {
+                            // Salin ke gallery publik agar tampil di aplikasi Galeri
+                            saveImageToPublicGallery(processedPath)
+                            viewModel.recordPhoto(processedPath)
+                            showToast(getString(R.string.photo_saved))
+                        } else {
+                            showToast(getString(R.string.photo_failed))
+                        }
+                        currentPhotoPath = null
+                        currentPhotoUri = null
+                    }
+                }
             } else {
                 showToast(getString(R.string.photo_failed))
+                currentPhotoPath = null
+                currentPhotoUri = null
             }
         }
 
@@ -132,9 +173,6 @@ class MapFragment : Fragment() {
     private var isRecording = false
     private var recordingTimerJob: Job? = null
     private var recordingSeconds = 0
-
-    private var currentPhotoPath: String? = null
-
 
     private val micPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -189,7 +227,6 @@ class MapFragment : Fragment() {
             sensorGateway.stopListening()
             viewModel.stopLocationTracking()
         }
-        // Hentikan recording jika fragment di-pause
         if (isRecording) stopVoiceRecording()
     }
 
@@ -240,12 +277,10 @@ class MapFragment : Fragment() {
             isDragEnabled = false
             setScaleEnabled(false)
             legend.isEnabled = false
-
             xAxis.isEnabled = false
 
             axisLeft.apply {
                 setDrawLabels(true)
-                // Warna putih agar kontras di atas background gelap
                 textColor = Color.WHITE
                 textSize = 10f
                 gridColor = Color.argb(80, 255, 255, 255)
@@ -277,14 +312,9 @@ class MapFragment : Fragment() {
                 )
             }
             axisRight.isEnabled = false
-
-            // PENTING: background gelap agar semua elemen putih kelihatan
             setBackgroundColor(Color.argb(200, 15, 15, 30))
-
             setNoDataText(getString(R.string.chart_no_data))
             setNoDataTextColor(Color.WHITE)
-
-            // Border chart
             setDrawBorders(true)
             setBorderColor(Color.argb(100, 255, 255, 255))
             setBorderWidth(0.5f)
@@ -304,26 +334,19 @@ class MapFragment : Fragment() {
         }
 
         fabCamera.setOnClickListener {
-            if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
-                openCamera()
-            } else {
-                showToast(getString(R.string.survey_not_active))
-            }
+            if (viewModel.isSurveying.value && !viewModel.isPaused.value) openCamera()
+            else showToast(getString(R.string.survey_not_active))
         }
 
         fabVoice.setOnClickListener {
             if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
-                if (isRecording) stopVoiceRecording()
-                else openVoiceRecorder()
+                if (isRecording) stopVoiceRecording() else openVoiceRecorder()
             } else {
                 showToast(getString(R.string.survey_not_active))
             }
         }
 
-        binding.btnStopMapRecording.setOnClickListener {
-            stopVoiceRecording()
-        }
-
+        binding.btnStopMapRecording.setOnClickListener { stopVoiceRecording() }
         fabCondition.setOnClickListener { showConditionPicker() }
         fabSurface.setOnClickListener { showSurfacePicker() }
 
@@ -343,18 +366,15 @@ class MapFragment : Fragment() {
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun openCamera() {
-        when {
-            ContextCompat.checkSelfPermission(
-                requireContext(), Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED -> launchCamera()
-
-            else -> cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
+            == PackageManager.PERMISSION_GRANTED
+        ) launchCamera()
+        else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
     private fun launchCamera() {
         try {
-            val photoFile = createImageFile()
+            val photoFile = createTempImageFile()
             val uri = FileProvider.getUriForFile(
                 requireContext(),
                 "${BuildConfig.APPLICATION_ID}.fileprovider",
@@ -368,28 +388,112 @@ class MapFragment : Fragment() {
         }
     }
 
-    private fun createImageFile(): File {
+    /** File sementara di app-private dir untuk proses watermark */
+    private fun createTempImageFile(): File {
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val distance = viewModel.distance.value.toInt() // jarak dalam meter
+        val distance = viewModel.distance.value.toInt()
         val condition = viewModel.currentCondition.value.name
         val fileName = "ROADSENSE_${timestamp}_${distance}m_${condition}.jpg"
         val storageDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-        return File(storageDir, fileName).apply {
-            currentPhotoPath = absolutePath
+        return File(storageDir, fileName).also { currentPhotoPath = it.absolutePath }
+    }
+
+    /** Tambahkan watermark teks ke gambar, kembalikan path file */
+    private fun addWatermarkToImage(originalPath: String, textLines: List<String>): String? {
+        return try {
+            val originalBitmap = BitmapFactory.decodeFile(originalPath) ?: return null
+            val mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+            val canvas = Canvas(mutableBitmap)
+
+            val paint = Paint().apply {
+                color = Color.WHITE
+                textSize = 40f
+                isAntiAlias = true
+                setShadowLayer(5f, 2f, 2f, Color.BLACK)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+
+            var y = 80f
+            for (line in textLines) {
+                canvas.drawText(line, 50f, y, paint)
+                y += 60f
+            }
+
+            File(originalPath).outputStream().use { out ->
+                mutableBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+            }
+            originalBitmap.recycle()
+            mutableBitmap.recycle()
+            originalPath
+        } catch (e: Exception) {
+            Timber.e(e, "Gagal menambahkan watermark")
+            null
         }
     }
+
+    /**
+     * Salin foto ke galeri publik agar muncul di aplikasi Galeri/Photos.
+     * Android 10+ → MediaStore API
+     * Android 9-  → salin ke DIRECTORY_PICTURES publik + MediaScannerConnection
+     */
+    private suspend fun saveImageToPublicGallery(sourcePath: String) = withContext(Dispatchers.IO) {
+        try {
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val displayName = "RoadSense_$timestamp.jpg"
+            val sourceFile = File(sourcePath)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // API 29+ – gunakan MediaStore
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(MediaStore.Images.Media.RELATIVE_PATH,
+                        "${Environment.DIRECTORY_PICTURES}/RoadSense")
+                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                }
+                val resolver = requireContext().contentResolver
+                val uri: Uri? = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { out: OutputStream ->
+                        sourceFile.inputStream().use { it.copyTo(out) }
+                    }
+                    values.clear()
+                    values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                    resolver.update(uri, values, null, null)
+                    Timber.d("Photo saved to gallery via MediaStore: $uri")
+                }
+            } else {
+                // API 28 ke bawah – salin ke folder publik lalu scan
+                val publicPictures = Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_PICTURES
+                )
+                val destDir = File(publicPictures, "RoadSense").apply { mkdirs() }
+                val destFile = File(destDir, displayName)
+                sourceFile.copyTo(destFile, overwrite = true)
+
+                // MediaScannerConnection menggantikan deprecated ACTION_MEDIA_SCANNER_SCAN_FILE
+                MediaScannerConnection.scanFile(
+                    requireContext(),
+                    arrayOf(destFile.absolutePath),
+                    arrayOf("image/jpeg"),
+                    null
+                )
+                Timber.d("Photo saved to gallery: ${destFile.absolutePath}")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Gagal menyimpan foto ke galeri")
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Voice Recording
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun openVoiceRecorder() {
-        when {
-            ContextCompat.checkSelfPermission(
-                requireContext(), Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED -> startVoiceRecording()
-
-            else -> micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO)
+            == PackageManager.PERMISSION_GRANTED
+        ) startVoiceRecording()
+        else micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     private fun startVoiceRecording() {
@@ -425,11 +529,8 @@ class MapFragment : Fragment() {
             recordingSeconds = 0
             showRecordingIndicator(true)
             startRecordingTimer()
-
-            // Ganti ikon FAB voice jadi stop (merah)
             fabVoice.backgroundTintList =
                 ContextCompat.getColorStateList(requireContext(), R.color.red)
-
             Timber.d("Recording started: ${audioFile.absolutePath}")
 
         } catch (e: Exception) {
@@ -448,7 +549,7 @@ class MapFragment : Fragment() {
             currentAudioFile?.let { file ->
                 viewModel.recordVoice(file.absolutePath)
                 Timber.d("Recording saved: ${file.absolutePath}")
-                showToast(getString(R.string.play_recording))
+                showToast(getString(R.string.audio_saved))
             }
         } catch (e: Exception) {
             Timber.e(e, "Error stopping recording")
@@ -458,7 +559,6 @@ class MapFragment : Fragment() {
             isRecording = false
             recordingTimerJob?.cancel()
             showRecordingIndicator(false)
-            // Reset warna FAB voice
             fabVoice.backgroundTintList =
                 ContextCompat.getColorStateList(requireContext(), R.color.primary_dark)
         }
@@ -475,15 +575,12 @@ class MapFragment : Fragment() {
 
     private fun showRecordingIndicator(show: Boolean) {
         binding.voiceRecordingIndicator.visibility = if (show) View.VISIBLE else View.GONE
-        if (!show) {
-            binding.tvRecordingTimer.text = "00:00"
-        }
+        if (!show) binding.tvRecordingTimer.text = getString(R.string.timer_default)
     }
 
     private fun startRecordingTimer() {
         recordingTimerJob?.cancel()
         recordingTimerJob = viewLifecycleOwner.lifecycleScope.launch {
-            // Animasi dot berkedip
             var dotVisible = true
             while (isRecording) {
                 recordingSeconds++
@@ -491,7 +588,6 @@ class MapFragment : Fragment() {
                 val seconds = recordingSeconds % 60
                 binding.tvRecordingTimer.text =
                     String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
-                // Kedipkan dot
                 dotVisible = !dotVisible
                 binding.tvRecordingDot.visibility =
                     if (dotVisible) View.VISIBLE else View.INVISIBLE
@@ -554,7 +650,6 @@ class MapFragment : Fragment() {
             }
         }
         accuracyCircle?.let { mapView.overlays.add(it) }
-
         myLocationMarker?.let { marker ->
             mapView.overlays.remove(marker)
             mapView.overlays.add(marker)
@@ -602,8 +697,7 @@ class MapFragment : Fragment() {
 
     private fun updateNavigationMode(location: Location) {
         if (!isOrientationEnabled) return
-        val rawBearing = location.bearing
-        val smoothBearing = lastBearing + (rawBearing - lastBearing) * 0.2f
+        val smoothBearing = lastBearing + (location.bearing - lastBearing) * 0.2f
         lastBearing = smoothBearing
         mapView.setMapOrientation(-smoothBearing)
     }
@@ -622,11 +716,8 @@ class MapFragment : Fragment() {
     private fun updateChart(history: List<Float>) {
         if (!isChartVisible || history.isEmpty()) return
 
-        val entries = history.mapIndexed { index, value ->
-            Entry(index.toFloat(), value)
-        }
-
-        val lastVal = history.lastOrNull() ?: 0f
+        val entries = history.mapIndexed { index, value -> Entry(index.toFloat(), value) }
+        val lastVal = history.last()
         val lineColor = getConditionColor(lastVal)
 
         val dataSet = LineDataSet(entries, getString(R.string.chart_z_label)).apply {
@@ -641,13 +732,12 @@ class MapFragment : Fragment() {
             highLightColor = Color.WHITE
         }
 
-        // Update badge kondisi di header chart
         binding.tvChartConditionBadge.apply {
             text = when {
                 lastVal < viewModel.thresholdBaik.value -> getString(R.string.condition_baik)
                 lastVal < viewModel.thresholdSedang.value -> getString(R.string.condition_sedang)
                 lastVal < viewModel.thresholdRusakRingan.value -> getString(R.string.condition_rusak_ringan)
-                else -> "Rusak Berat"
+                else -> getString(R.string.condition_rusak_berat)
             }
             setTextColor(lineColor)
         }
@@ -659,13 +749,10 @@ class MapFragment : Fragment() {
     }
 
     private fun getConditionColor(vibValue: Float): Int {
-        val thB = viewModel.thresholdBaik.value
-        val thS = viewModel.thresholdSedang.value
-        val thR = viewModel.thresholdRusakRingan.value
         return when {
-            vibValue < thB -> colorBaik
-            vibValue < thS -> colorSedang
-            vibValue < thR -> colorRusakRingan
+            vibValue < viewModel.thresholdBaik.value -> colorBaik
+            vibValue < viewModel.thresholdSedang.value -> colorSedang
+            vibValue < viewModel.thresholdRusakRingan.value -> colorRusakRingan
             else -> colorRusakBerat
         }
     }
@@ -697,7 +784,7 @@ class MapFragment : Fragment() {
                 val surveyor = etSurveyor?.text?.toString()?.trim() ?: ""
                 val roadName = etRoadName?.text?.toString()?.trim() ?: ""
                 if (surveyor.isBlank()) {
-                    showToast("Nama surveyor wajib diisi")
+                    showToast(getString(R.string.surveyor_name_required))
                     return@setPositiveButton
                 }
                 viewModel.startSurvey(surveyor, roadName)
@@ -707,9 +794,9 @@ class MapFragment : Fragment() {
     }
 
     private fun showConditionPicker() {
-        val conditions = Condition.values()
-        val currentCondition = viewModel.currentCondition.value
-        val currentIndex = conditions.indexOf(currentCondition).coerceAtLeast(0)
+        // FIX: Enum.entries menggantikan Enum.values() (deprecated sejak Kotlin 1.9)
+        val conditions = Condition.entries.toTypedArray()
+        val currentIndex = conditions.indexOf(viewModel.currentCondition.value).coerceAtLeast(0)
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.pick_condition_title))
             .setSingleChoiceItems(
@@ -719,13 +806,13 @@ class MapFragment : Fragment() {
                 val selected = conditions[which]
                 if (!viewModel.checkConditionConsistency(selected)) {
                     MaterialAlertDialogBuilder(requireContext())
-                        .setTitle("Peringatan")
-                        .setMessage("Data getaran menunjukkan kondisi berbeda. Yakin memilih ${selected.name}?")
-                        .setPositiveButton("Ya") { _, _ ->
+                        .setTitle(getString(R.string.warning_title))
+                        .setMessage(getString(R.string.condition_mismatch_message, selected.name))
+                        .setPositiveButton(getString(R.string.ok)) { _, _ ->
                             viewModel.recordCondition(selected)
                             dialog.dismiss()
                         }
-                        .setNegativeButton("Batal", null)
+                        .setNegativeButton(getString(R.string.cancel), null)
                         .show()
                 } else {
                     viewModel.recordCondition(selected)
@@ -738,9 +825,9 @@ class MapFragment : Fragment() {
     }
 
     private fun showSurfacePicker() {
-        val surfaces = Surface.values()
-        val currentSurface = viewModel.currentSurface.value
-        val currentIndex = surfaces.indexOf(currentSurface).coerceAtLeast(0)
+        // FIX: Enum.entries menggantikan Enum.values() (deprecated sejak Kotlin 1.9)
+        val surfaces = Surface.entries.toTypedArray()
+        val currentIndex = surfaces.indexOf(viewModel.currentSurface.value).coerceAtLeast(0)
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.pick_surface_title))
             .setSingleChoiceItems(
@@ -795,8 +882,7 @@ class MapFragment : Fragment() {
     private fun updateSurveyButton(isSurveying: Boolean, isPaused: Boolean) {
         fabSurvey.setImageResource(
             when {
-                !isSurveying -> R.drawable.ic_play
-                isPaused -> R.drawable.ic_play
+                !isSurveying || isPaused -> R.drawable.ic_play
                 else -> R.drawable.ic_pause
             }
         )
@@ -835,7 +921,6 @@ class MapFragment : Fragment() {
         }.onEach { (surveying, paused) ->
             updateSurveyButton(surveying, paused)
             showSurveyFABs(surveying)
-            // Reset chart saat survey berhenti
             if (!surveying) {
                 chart.clear()
                 chart.setNoDataText(getString(R.string.chart_no_data))
@@ -873,8 +958,7 @@ class MapFragment : Fragment() {
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 
         viewModel.speed.onEach { speedMs ->
-            binding.tvSpeed.text =
-                getString(R.string.speed_format, (speedMs * 3.6f).toInt())
+            binding.tvSpeed.text = getString(R.string.speed_format, (speedMs * 3.6f).toInt())
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 
         viewModel.distance.onEach { dist ->
@@ -912,9 +996,9 @@ class MapFragment : Fragment() {
             if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
                 Snackbar.make(
                     binding.root,
-                    "Jarak ${distance.toInt()} m tercapai. Ambil foto?",
+                    getString(R.string.distance_reached_prompt, distance.toInt()),
                     Snackbar.LENGTH_LONG
-                ).setAction("Foto") {
+                ).setAction(getString(R.string.take_photo)) {
                     openCamera()
                 }.show()
             }
