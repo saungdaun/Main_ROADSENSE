@@ -104,13 +104,6 @@
         android:gravity="center_vertical"
         android:visibility="gone">
 
-        <ImageView
-            android:layout_width="18dp"
-            android:layout_height="18dp"
-            android:src="@drawable/ic_flag_start"
-            android:layout_marginEnd="8dp"
-            app:tint="@color/white" />
-
         <TextView
             android:id="@+id/tvSegmentStartKm"
             android:layout_width="0dp"

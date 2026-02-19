@@ -1,9 +1,12 @@
 package zaujaani.roadsensebasic.ui.summary
 
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -13,9 +16,11 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import zaujaani.roadsensebasic.R
 import zaujaani.roadsensebasic.data.local.entity.EventType
+import zaujaani.roadsensebasic.data.local.entity.RoadEvent
 import zaujaani.roadsensebasic.data.local.entity.SurveySession
 import zaujaani.roadsensebasic.databinding.FragmentSummaryBinding
 import zaujaani.roadsensebasic.util.Constants
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -177,16 +182,62 @@ class SummaryFragment : Fragment() {
             }
         }
 
+        // Buat dialog dengan tombol Lihat Foto
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.detail_title))
             .setMessage(sb.toString())
             .setPositiveButton(getString(R.string.export_gpx)) { _, _ ->
                 exportSession(detail.session, "gpx")
             }
-            .setNeutralButton(getString(R.string.export_csv)) { _, _ ->
-                exportSession(detail.session, "csv")
+            .setNeutralButton("Lihat Foto") { _, _ ->
+                showPhotoListDialog(detail.events)
             }
             .setNegativeButton(getString(R.string.ok), null)
+            .show()
+    }
+
+    private fun showPhotoListDialog(events: List<RoadEvent>) {
+        val photoEvents = events.filter { it.eventType == EventType.PHOTO }
+        if (photoEvents.isEmpty()) {
+            Toast.makeText(requireContext(), "Tidak ada foto", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val items = photoEvents.map { event ->
+            val sta = event.distance.toInt()
+            val staStr = "STA ${sta/100}+${sta%100}  ${event.value.substringAfterLast('/')}"
+            staStr
+        }.toTypedArray()
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Daftar Foto")
+            .setItems(items) { _, which ->
+                val selectedEvent = photoEvents[which]
+                showPhotoPreview(selectedEvent.value)
+            }
+            .setNegativeButton("Tutup", null)
+            .show()
+    }
+
+    private fun showPhotoPreview(photoPath: String) {
+        val file = File(photoPath)
+        if (!file.exists()) {
+            Toast.makeText(requireContext(), "File foto tidak ditemukan", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val bitmap = BitmapFactory.decodeFile(photoPath)
+        val imageView = ImageView(requireContext()).apply {
+            setImageBitmap(bitmap)
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setBackgroundColor(Color.BLACK)
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Preview Foto")
+            .setView(imageView)
+            .setPositiveButton("Tutup", null)
             .show()
     }
 

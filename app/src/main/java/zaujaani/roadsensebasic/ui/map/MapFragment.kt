@@ -370,8 +370,11 @@ class MapFragment : Fragment() {
 
     private fun createImageFile(): File {
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val distance = viewModel.distance.value.toInt() // jarak dalam meter
+        val condition = viewModel.currentCondition.value.name
+        val fileName = "ROADSENSE_${timestamp}_${distance}m_${condition}.jpg"
         val storageDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-        return File.createTempFile("ROADSENSE_${timestamp}_", ".jpg", storageDir).apply {
+        return File(storageDir, fileName).apply {
             currentPhotoPath = absolutePath
         }
     }
@@ -392,8 +395,12 @@ class MapFragment : Fragment() {
     private fun startVoiceRecording() {
         try {
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val distance = viewModel.distance.value.toInt()
+            val condition = viewModel.currentCondition.value.name
+            val surface = viewModel.currentSurface.value.name
+            val fileName = "ROADSENSE_AUDIO_${timestamp}_${distance}m_${condition}_${surface}.mp4"
             val audioDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-            val audioFile = File(audioDir, "ROADSENSE_AUDIO_${timestamp}.mp4")
+            val audioFile = File(audioDir, fileName)
             currentAudioFile = audioFile
 
             mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

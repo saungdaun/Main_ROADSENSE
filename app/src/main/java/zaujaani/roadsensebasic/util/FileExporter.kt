@@ -124,6 +124,7 @@ object FileExporter {
                 // Header session
                 w.write("# LAPORAN SURVEY KONDISI JALAN - ROADSENSE\n")
                 w.write("# Tanggal Ekspor,${csvDateFormat.format(Date())}\n")
+                w.write("# Nama Sesi,${sessionName}\n")
                 w.write("# Surveyor,${session.surveyorName}\n")
                 w.write("# Nama Jalan,${session.roadName}\n")
                 w.write("# Perangkat,${session.deviceModel}\n")

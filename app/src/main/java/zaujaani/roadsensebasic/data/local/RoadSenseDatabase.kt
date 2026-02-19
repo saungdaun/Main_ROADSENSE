@@ -18,55 +18,67 @@ import zaujaani.roadsensebasic.data.local.entity.TelemetryRaw
     entities = [
         TelemetryRaw::class,
         SurveySession::class,
-        RoadEvent::class      // ganti RoadSegment dengan RoadEvent
+        RoadEvent::class
     ],
-    version = 5, // naikkan dari 4 ke 5
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class RoadSenseDatabase : RoomDatabase() {
+
     abstract fun telemetryDao(): TelemetryDao
     abstract fun sessionDao(): SessionDao
-    abstract fun eventDao(): EventDao   // tambahkan DAO untuk event
-    // abstract fun segmentDao(): SegmentDao  // HAPUS
+    abstract fun eventDao(): EventDao
 
     companion object {
+
         @Volatile
         private var INSTANCE: RoadSenseDatabase? = null
 
-        // Migrasi sebelumnya (1→2, 2→3, 3→4) tetap ada
+        // =========================
+        // MIGRATION 1 → 2
+        // =========================
         private val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE road_segments ADD COLUMN startLat REAL NOT NULL DEFAULT 0.0")
-                database.execSQL("ALTER TABLE road_segments ADD COLUMN startLng REAL NOT NULL DEFAULT 0.0")
-                database.execSQL("ALTER TABLE road_segments ADD COLUMN endLat REAL NOT NULL DEFAULT 0.0")
-                database.execSQL("ALTER TABLE road_segments ADD COLUMN endLng REAL NOT NULL DEFAULT 0.0")
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE road_segments ADD COLUMN startLat REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE road_segments ADD COLUMN startLng REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE road_segments ADD COLUMN endLat REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE road_segments ADD COLUMN endLng REAL NOT NULL DEFAULT 0.0")
             }
         }
 
+        // =========================
+        // MIGRATION 2 → 3
+        // =========================
         private val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE survey_sessions ADD COLUMN surveyorName TEXT NOT NULL DEFAULT ''")
-                database.execSQL("ALTER TABLE survey_sessions ADD COLUMN roadName TEXT NOT NULL DEFAULT ''")
-                database.execSQL("ALTER TABLE survey_sessions ADD COLUMN startLat REAL NOT NULL DEFAULT 0.0")
-                database.execSQL("ALTER TABLE survey_sessions ADD COLUMN startLng REAL NOT NULL DEFAULT 0.0")
-                database.execSQL("ALTER TABLE survey_sessions ADD COLUMN endLat REAL NOT NULL DEFAULT 0.0")
-                database.execSQL("ALTER TABLE survey_sessions ADD COLUMN endLng REAL NOT NULL DEFAULT 0.0")
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE survey_sessions ADD COLUMN surveyorName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE survey_sessions ADD COLUMN roadName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE survey_sessions ADD COLUMN startLat REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE survey_sessions ADD COLUMN startLng REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE survey_sessions ADD COLUMN endLat REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE survey_sessions ADD COLUMN endLng REAL NOT NULL DEFAULT 0.0")
             }
         }
 
+        // =========================
+        // MIGRATION 3 → 4
+        // =========================
         private val MIGRATION_3_4 = object : Migration(3, 4) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE telemetry_raw ADD COLUMN vibrationX REAL NOT NULL DEFAULT 0.0")
-                database.execSQL("ALTER TABLE telemetry_raw ADD COLUMN vibrationY REAL NOT NULL DEFAULT 0.0")
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE telemetry_raw ADD COLUMN vibrationX REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE telemetry_raw ADD COLUMN vibrationY REAL NOT NULL DEFAULT 0.0")
             }
         }
 
-        // ** BARU: Migrasi 4 → 5 **
+        // =========================
+        // MIGRATION 4 → 5
+        // =========================
         private val MIGRATION_4_5 = object : Migration(4, 5) {
-            override fun migrate(database: SupportSQLiteDatabase) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+
                 // 1. Buat tabel road_events
-                database.execSQL("""
+                db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `road_events` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         `sessionId` INTEGER NOT NULL,
@@ -80,14 +92,14 @@ abstract class RoadSenseDatabase : RoomDatabase() {
                     )
                 """)
 
-                // 2. Hapus tabel road_segments (data lama tidak dipakai)
-                database.execSQL("DROP TABLE IF EXISTS `road_segments`")
-
-                // 3. Pastikan kolom roadName sudah ada di survey_sessions (opsional, sudah ada dari migrasi 2_3)
-                // Tidak perlu tambah karena sudah ada.
+                // 2. Hapus tabel lama
+                db.execSQL("DROP TABLE IF EXISTS `road_segments`")
             }
         }
 
+        // =========================
+        // GET INSTANCE
+        // =========================
         fun getInstance(context: Context): RoadSenseDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -99,10 +111,11 @@ abstract class RoadSenseDatabase : RoomDatabase() {
                         MIGRATION_1_2,
                         MIGRATION_2_3,
                         MIGRATION_3_4,
-                        MIGRATION_4_5   // tambahkan migrasi baru
+                        MIGRATION_4_5
                     )
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
+
                 INSTANCE = instance
                 instance
             }

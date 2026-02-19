@@ -25,7 +25,7 @@ data class SessionDetailUi(
     val events: List<RoadEvent>,
     val totalDistance: Double,
     val durationMinutes: Int,
-    val avgConfidence: Int,
+    val avgConfidence: Int,          // tetap Int
     val photoCount: Int,
     val audioCount: Int,
     val conditionDistribution: Map<String, Double>,
@@ -36,7 +36,8 @@ data class SessionDetailUi(
 class SummaryViewModel @Inject constructor(
     private val surveyRepository: SurveyRepository,
     private val telemetryRepository: TelemetryRepository,
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext
+    private val context: Context
 ) : ViewModel() {
 
     private val _sessions = MutableLiveData<List<SessionWithCount>>()
@@ -85,7 +86,13 @@ class SummaryViewModel @Inject constructor(
 
                 val totalDistance = session.totalDistance
                 val durationMinutes = ((session.endTime ?: session.startTime) - session.startTime) / 60000
-                val avgConfidence = 0 // Bisa dihitung nanti jika diperlukan
+
+                // Hitung avgConfidence dari telemetri (akurasi GPS)
+                val avgConfidence = if (telemetries.isNotEmpty()) {
+                    telemetries.map { t ->
+                        (100 - (t.gpsAccuracy * 2)).coerceIn(0f, 100f).toInt()
+                    }.average().roundToInt()
+                } else 0
 
                 val photoCount = events.count { it.eventType == EventType.PHOTO }
                 val audioCount = events.count { it.eventType == EventType.VOICE }
@@ -123,7 +130,7 @@ class SummaryViewModel @Inject constructor(
                     surfaceDistribution = surfaceMap
                 )
                 _sessionDetail.value = detail
-                Timber.d("Loaded detail for session $sessionId with ${telemetries.size} telemetry points")
+                Timber.d("Loaded detail for session $sessionId with ${telemetries.size} telemetry points, avgConfidence=$avgConfidence")
             } catch (e: Exception) {
                 Timber.e(e, "Gagal memuat detail sesi $sessionId")
                 _sessionDetail.value = null
