@@ -53,17 +53,19 @@ class MapViewModel @Inject constructor(
     private val _distance = MutableStateFlow(0.0)
     val distance: StateFlow<Double> = _distance.asStateFlow()
 
-    // Vibration dari engine (sudah terfilter)
     val vibration: StateFlow<Float> = surveyEngine.currentVibration
 
-    // ========== SURVEY STATE (dari SurveyEngine) ==========
+    // ========== SURVEY STATE ==========
     val isSurveying: StateFlow<Boolean> = surveyEngine.isSurveying
     val isPaused: StateFlow<Boolean> = surveyEngine.isPaused
     val vibrationHistory: StateFlow<List<Float>> = surveyEngine.vibrationHistory
 
-    // ========== CONDITION & SURFACE (dari engine) ==========
-    val currentCondition: StateFlow<Condition> = MutableStateFlow(Condition.BAIK) // Akan diupdate
-    val currentSurface: StateFlow<Surface> = MutableStateFlow(Surface.ASPAL)
+    // ========== CONDITION & SURFACE ==========
+    private val _currentCondition = MutableStateFlow(Condition.BAIK)
+    val currentCondition: StateFlow<Condition> = _currentCondition.asStateFlow()
+
+    private val _currentSurface = MutableStateFlow(Surface.ASPAL)
+    val currentSurface: StateFlow<Surface> = _currentSurface.asStateFlow()
 
     // ========== THRESHOLDS ==========
     private val _thresholdBaik = MutableStateFlow(Constants.DEFAULT_THRESHOLD_BAIK)
@@ -93,19 +95,18 @@ class MapViewModel @Inject constructor(
             preferencesManager.thresholdRusakRingan.collect { _thresholdRusakRingan.value = it }
         }
 
-        // Update kondisi dan surface dari engine (perlu ditambahkan di engine nanti)
-        // Untuk sementara, kita bisa set nilai default. Nanti engine akan punya state untuk kondisi dan surface.
-        // Atau kita bisa mengambil dari event terakhir? Namun untuk sederhana, kita pakai state di viewmodel sendiri.
-        // Kita akan update dari engine nanti setelah ada mekanisme.
+        viewModelScope.launch {
+            surveyEngine.distanceTrigger.collect { distance ->
+                _distanceTrigger.emit(distance)
+            }
+        }
     }
 
     // ========== LOCATION TRACKING ==========
     fun startLocationTracking() {
         if (locationTrackingJob?.isActive == true) return
         locationTrackingJob = gpsGateway.getLocationFlow()
-            .catch { e ->
-                Timber.e(e, "Error in location flow")
-            }
+            .catch { e -> Timber.e(e, "Error in location flow") }
             .onEach { location ->
                 _location.value = location
                 _speed.value = location.speed
@@ -125,20 +126,17 @@ class MapViewModel @Inject constructor(
             surveyEngine.startNewSession(surveyorName, roadName)
             _distance.value = 0.0
             startForegroundService()
-            Timber.d("Survey started: surveyor=$surveyorName, road=$roadName")
         }
     }
 
     fun pauseSurvey() {
         surveyEngine.pauseSurvey()
         sendServiceCommand(Constants.ACTION_PAUSE)
-        Timber.d("Survey paused")
     }
 
     fun resumeSurvey() {
         surveyEngine.resumeSurvey()
         sendServiceCommand(Constants.ACTION_RESUME)
-        Timber.d("Survey resumed")
     }
 
     fun stopSurveyAndSave() {
@@ -146,7 +144,6 @@ class MapViewModel @Inject constructor(
             surveyEngine.endCurrentSession()
             stopForegroundService()
             _distance.value = 0.0
-            Timber.d("Survey stopped and saved")
         }
     }
 
@@ -155,7 +152,6 @@ class MapViewModel @Inject constructor(
             val sessionId = surveyEngine.getCurrentSessionId()
             if (sessionId != null) {
                 surveyRepository.deleteSessionById(sessionId)
-                Timber.d("Session $sessionId discarded")
             }
             surveyEngine.discardCurrentSession()
             stopForegroundService()
@@ -166,31 +162,25 @@ class MapViewModel @Inject constructor(
     // ========== EVENT RECORDING ==========
     fun recordCondition(condition: Condition) {
         surveyEngine.recordConditionChange(condition)
-        // Update local state jika perlu
-        (currentCondition as MutableStateFlow).value = condition
-        Timber.d("Condition recorded: $condition")
+        _currentCondition.value = condition
     }
 
     fun recordSurface(surface: Surface) {
         surveyEngine.recordSurfaceChange(surface)
-        (currentSurface as MutableStateFlow).value = surface
-        Timber.d("Surface recorded: $surface")
+        _currentSurface.value = surface
     }
 
     fun recordPhoto(path: String, notes: String? = null) {
         surveyEngine.recordPhoto(path, notes)
-        Timber.d("Photo recorded: $path")
     }
 
     fun recordVoice(path: String, notes: String? = null) {
         surveyEngine.recordVoice(path, notes)
-        Timber.d("Voice recorded: $path")
     }
 
     // ========== VALIDASI KONSISTENSI ==========
-    fun checkConditionConsistency(condition: Condition): Boolean {
-        return surveyEngine.checkConditionConsistency(condition)
-    }
+    fun checkConditionConsistency(condition: Condition): Boolean =
+        surveyEngine.checkConditionConsistency(condition)
 
     // ========== FOREGROUND SERVICE ==========
     private fun startForegroundService() {
@@ -203,7 +193,6 @@ class MapViewModel @Inject constructor(
             } else {
                 context.startService(intent)
             }
-            Timber.d("Foreground service start command sent")
         } catch (e: Exception) {
             Timber.e(e, "Failed to start foreground service")
         }
@@ -219,7 +208,6 @@ class MapViewModel @Inject constructor(
         }
         try {
             context.startService(intent)
-            Timber.d("Service command sent: $action")
         } catch (e: Exception) {
             Timber.e(e, "Failed to send service command: $action")
         }
@@ -228,6 +216,5 @@ class MapViewModel @Inject constructor(
     override fun onCleared() {
         stopLocationTracking()
         super.onCleared()
-        Timber.d("MapViewModel cleared")
     }
 }

@@ -18,7 +18,7 @@
 
     <item
         android:id="@+id/bluetoothFragment"
-        android:title="@string/menu_bluetooth"
-        android:icon="@android:drawable/ic_menu_share" />
+        android:icon="@drawable/ic_bluetooth"
+        android:title="@string/menu_bluetooth" />
 
 </menu>

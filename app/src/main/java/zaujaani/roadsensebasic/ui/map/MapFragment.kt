@@ -1,15 +1,22 @@
 package zaujaani.roadsensebasic.ui.map
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.location.Location
+import android.media.MediaRecorder
 import android.os.Bundle
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -23,10 +30,13 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.FlowPreview
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -43,6 +53,11 @@ import zaujaani.roadsensebasic.data.local.entity.Surface
 import zaujaani.roadsensebasic.databinding.FragmentMapBinding
 import zaujaani.roadsensebasic.gateway.SensorGateway
 import zaujaani.roadsensebasic.util.Constants
+import java.io.File
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.abs
 import javax.inject.Inject
 
@@ -57,6 +72,7 @@ class MapFragment : Fragment() {
 
     private val viewModel: MapViewModel by viewModels()
 
+    // ── Views ──────────────────────────────────────────────────────────────────
     private lateinit var mapView: MapView
     private lateinit var chart: LineChart
     private lateinit var fabSurvey: FloatingActionButton
@@ -68,24 +84,67 @@ class MapFragment : Fragment() {
     private lateinit var fabSurface: FloatingActionButton
     private lateinit var fabToggleOrientation: FloatingActionButton
 
+    // ── Map overlays ───────────────────────────────────────────────────────────
     private val pathPoints = mutableListOf<GeoPoint>()
     private var currentPolyline = Polyline()
     private var myLocationMarker: Marker? = null
     private var accuracyCircle: Polygon? = null
 
+    // ── Map state ──────────────────────────────────────────────────────────────
     private var lastCameraPoint: GeoPoint? = null
     private var lastZoomLevel: Double = 18.0
     private var lastBearing = 0f
-
     private var isChartVisible = true
     private var isFollowingGPS = true
     private var isOrientationEnabled = true
 
+    // ── Colors (lazy) ──────────────────────────────────────────────────────────
     private val colorBaik by lazy { ContextCompat.getColor(requireContext(), R.color.green) }
     private val colorSedang by lazy { ContextCompat.getColor(requireContext(), R.color.yellow) }
     private val colorRusakRingan by lazy { ContextCompat.getColor(requireContext(), R.color.orange) }
     private val colorRusakBerat by lazy { ContextCompat.getColor(requireContext(), R.color.red) }
     private val colorDefault by lazy { ContextCompat.getColor(requireContext(), R.color.primary) }
+
+    // ── Camera ─────────────────────────────────────────────────────────────────
+    private var currentPhotoUri: android.net.Uri? = null
+
+    private val takePictureLauncher =
+        registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            if (success && currentPhotoPath != null) {
+                Timber.d("Photo saved: $currentPhotoPath")
+                showToast(getString(R.string.photo_saved))
+                viewModel.recordPhoto(currentPhotoPath!!)
+                currentPhotoPath = null
+            } else {
+                showToast(getString(R.string.photo_failed))
+            }
+        }
+
+    private val cameraPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) launchCamera()
+            else showToast(getString(R.string.camera_permission_required))
+        }
+
+    // ── Voice Recording ────────────────────────────────────────────────────────
+    private var mediaRecorder: MediaRecorder? = null
+    private var currentAudioFile: File? = null
+    private var isRecording = false
+    private var recordingTimerJob: Job? = null
+    private var recordingSeconds = 0
+
+    private var currentPhotoPath: String? = null
+
+
+    private val micPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) startVoiceRecording()
+            else showToast(getString(R.string.microphone_permission_required))
+        }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Lifecycle
+    // ─────────────────────────────────────────────────────────────────────────
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -116,6 +175,40 @@ class MapFragment : Fragment() {
         restoreSurveyState()
     }
 
+    override fun onResume() {
+        super.onResume()
+        mapView.onResume()
+        sensorGateway.startListening()
+        if (hasLocationPermission()) viewModel.startLocationTracking()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        mapView.onPause()
+        if (!viewModel.isSurveying.value) {
+            sensorGateway.stopListening()
+            viewModel.stopLocationTracking()
+        }
+        // Hentikan recording jika fragment di-pause
+        if (isRecording) stopVoiceRecording()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        mapView.overlays.clear()
+        recordingTimerJob?.cancel()
+        releaseMediaRecorder()
+        if (!viewModel.isSurveying.value) {
+            sensorGateway.stopListening()
+            viewModel.stopLocationTracking()
+        }
+        _binding = null
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Setup
+    // ─────────────────────────────────────────────────────────────────────────
+
     private fun bindViews() {
         mapView = binding.mapView
         chart = binding.chartVibration
@@ -139,6 +232,270 @@ class MapFragment : Fragment() {
         }
         initCurrentPolyline()
     }
+
+    private fun setupChart() {
+        chart.apply {
+            description.isEnabled = false
+            setTouchEnabled(false)
+            isDragEnabled = false
+            setScaleEnabled(false)
+            legend.isEnabled = false
+
+            xAxis.isEnabled = false
+
+            axisLeft.apply {
+                setDrawLabels(true)
+                // Warna putih agar kontras di atas background gelap
+                textColor = Color.WHITE
+                textSize = 10f
+                gridColor = Color.argb(80, 255, 255, 255)
+                axisLineColor = Color.WHITE
+                removeAllLimitLines()
+                addLimitLine(
+                    LimitLine(Constants.DEFAULT_THRESHOLD_BAIK, getString(R.string.condition_baik)).apply {
+                        lineColor = colorBaik
+                        textColor = colorBaik
+                        textSize = 9f
+                        lineWidth = 1.5f
+                    }
+                )
+                addLimitLine(
+                    LimitLine(Constants.DEFAULT_THRESHOLD_SEDANG, getString(R.string.condition_sedang)).apply {
+                        lineColor = colorSedang
+                        textColor = colorSedang
+                        textSize = 9f
+                        lineWidth = 1.5f
+                    }
+                )
+                addLimitLine(
+                    LimitLine(Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN, getString(R.string.condition_rusak_ringan)).apply {
+                        lineColor = colorRusakBerat
+                        textColor = colorRusakBerat
+                        textSize = 9f
+                        lineWidth = 1.5f
+                    }
+                )
+            }
+            axisRight.isEnabled = false
+
+            // PENTING: background gelap agar semua elemen putih kelihatan
+            setBackgroundColor(Color.argb(200, 15, 15, 30))
+
+            setNoDataText(getString(R.string.chart_no_data))
+            setNoDataTextColor(Color.WHITE)
+
+            // Border chart
+            setDrawBorders(true)
+            setBorderColor(Color.argb(100, 255, 255, 255))
+            setBorderWidth(0.5f)
+        }
+    }
+
+    private fun setupClickListeners() {
+        fabSurvey.setOnClickListener { handleSurveyButtonClick() }
+        fabStop.setOnClickListener { showStopSurveyConfirmation() }
+
+        fabToggleChart.setOnClickListener {
+            isChartVisible = !isChartVisible
+            binding.chartContainer.visibility = if (isChartVisible) View.VISIBLE else View.GONE
+            fabToggleChart.setImageResource(
+                if (isChartVisible) R.drawable.ic_chart else R.drawable.ic_chart_off
+            )
+        }
+
+        fabCamera.setOnClickListener {
+            if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
+                openCamera()
+            } else {
+                showToast(getString(R.string.survey_not_active))
+            }
+        }
+
+        fabVoice.setOnClickListener {
+            if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
+                if (isRecording) stopVoiceRecording()
+                else openVoiceRecorder()
+            } else {
+                showToast(getString(R.string.survey_not_active))
+            }
+        }
+
+        binding.btnStopMapRecording.setOnClickListener {
+            stopVoiceRecording()
+        }
+
+        fabCondition.setOnClickListener { showConditionPicker() }
+        fabSurface.setOnClickListener { showSurfacePicker() }
+
+        fabToggleOrientation.setOnClickListener {
+            isOrientationEnabled = !isOrientationEnabled
+            if (isOrientationEnabled) {
+                showToast(getString(R.string.orientation_enabled))
+            } else {
+                showToast(getString(R.string.orientation_disabled))
+                mapView.setMapOrientation(0f)
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Camera
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun openCamera() {
+        when {
+            ContextCompat.checkSelfPermission(
+                requireContext(), Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED -> launchCamera()
+
+            else -> cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun launchCamera() {
+        try {
+            val photoFile = createImageFile()
+            val uri = FileProvider.getUriForFile(
+                requireContext(),
+                "${BuildConfig.APPLICATION_ID}.fileprovider",
+                photoFile
+            )
+            currentPhotoUri = uri
+            takePictureLauncher.launch(uri)
+        } catch (e: IOException) {
+            Timber.e(e, "Error creating photo file")
+            showToast(getString(R.string.photo_failed))
+        }
+    }
+
+    private fun createImageFile(): File {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val storageDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        return File.createTempFile("ROADSENSE_${timestamp}_", ".jpg", storageDir).apply {
+            currentPhotoPath = absolutePath
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Voice Recording
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun openVoiceRecorder() {
+        when {
+            ContextCompat.checkSelfPermission(
+                requireContext(), Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED -> startVoiceRecording()
+
+            else -> micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun startVoiceRecording() {
+        try {
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val audioDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+            val audioFile = File(audioDir, "ROADSENSE_AUDIO_${timestamp}.mp4")
+            currentAudioFile = audioFile
+
+            mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                MediaRecorder(requireContext())
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+
+            mediaRecorder?.apply {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioSamplingRate(44100)
+                setAudioEncodingBitRate(128000)
+                setOutputFile(audioFile.absolutePath)
+                prepare()
+                start()
+            }
+
+            isRecording = true
+            recordingSeconds = 0
+            showRecordingIndicator(true)
+            startRecordingTimer()
+
+            // Ganti ikon FAB voice jadi stop (merah)
+            fabVoice.backgroundTintList =
+                ContextCompat.getColorStateList(requireContext(), R.color.red)
+
+            Timber.d("Recording started: ${audioFile.absolutePath}")
+
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to start recording")
+            showToast(getString(R.string.recording_failed))
+            releaseMediaRecorder()
+        }
+    }
+
+    private fun stopVoiceRecording() {
+        try {
+            mediaRecorder?.apply {
+                stop()
+                reset()
+            }
+            currentAudioFile?.let { file ->
+                viewModel.recordVoice(file.absolutePath)
+                Timber.d("Recording saved: ${file.absolutePath}")
+                showToast(getString(R.string.play_recording))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error stopping recording")
+            showToast(getString(R.string.recording_failed))
+        } finally {
+            releaseMediaRecorder()
+            isRecording = false
+            recordingTimerJob?.cancel()
+            showRecordingIndicator(false)
+            // Reset warna FAB voice
+            fabVoice.backgroundTintList =
+                ContextCompat.getColorStateList(requireContext(), R.color.primary_dark)
+        }
+    }
+
+    private fun releaseMediaRecorder() {
+        try {
+            mediaRecorder?.release()
+        } catch (e: Exception) {
+            Timber.e(e, "Error releasing MediaRecorder")
+        }
+        mediaRecorder = null
+    }
+
+    private fun showRecordingIndicator(show: Boolean) {
+        binding.voiceRecordingIndicator.visibility = if (show) View.VISIBLE else View.GONE
+        if (!show) {
+            binding.tvRecordingTimer.text = "00:00"
+        }
+    }
+
+    private fun startRecordingTimer() {
+        recordingTimerJob?.cancel()
+        recordingTimerJob = viewLifecycleOwner.lifecycleScope.launch {
+            // Animasi dot berkedip
+            var dotVisible = true
+            while (isRecording) {
+                recordingSeconds++
+                val minutes = recordingSeconds / 60
+                val seconds = recordingSeconds % 60
+                binding.tvRecordingTimer.text =
+                    String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+                // Kedipkan dot
+                dotVisible = !dotVisible
+                binding.tvRecordingDot.visibility =
+                    if (dotVisible) View.VISIBLE else View.INVISIBLE
+                delay(1000L)
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Map helpers
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun initCurrentPolyline() {
         currentPolyline = Polyline().apply {
@@ -175,7 +532,6 @@ class MapFragment : Fragment() {
         }
 
         accuracyCircle?.let { mapView.overlays.remove(it) }
-
         accuracyCircle = Polygon().apply {
             points = Polygon.pointsAsCircle(geoPoint, location.accuracy.toDouble())
             fillPaint.apply {
@@ -190,7 +546,6 @@ class MapFragment : Fragment() {
                 isAntiAlias = true
             }
         }
-
         accuracyCircle?.let { mapView.overlays.add(it) }
 
         myLocationMarker?.let { marker ->
@@ -200,30 +555,25 @@ class MapFragment : Fragment() {
 
         adjustZoomBasedOnAccuracy(location.accuracy)
         updateNavigationMode(location)
-
         mapView.invalidate()
     }
 
     private fun smoothFollow(location: Location) {
         val geoPoint = GeoPoint(location.latitude, location.longitude)
-
         if (lastCameraPoint == null) {
             mapView.controller.setCenter(geoPoint)
             lastCameraPoint = geoPoint
             return
         }
-
         val factor = when {
             location.speed < 3f -> 0.1
             location.speed < 10f -> 0.2
             else -> 0.3
         }
-
         val lat = lastCameraPoint!!.latitude +
                 (geoPoint.latitude - lastCameraPoint!!.latitude) * factor
         val lon = lastCameraPoint!!.longitude +
                 (geoPoint.longitude - lastCameraPoint!!.longitude) * factor
-
         val smoothPoint = GeoPoint(lat, lon)
         mapView.controller.setCenter(smoothPoint)
         lastCameraPoint = smoothPoint
@@ -237,7 +587,6 @@ class MapFragment : Fragment() {
             accuracy < 50 -> 16.5
             else -> 15.5
         }
-
         if (abs(targetZoom - lastZoomLevel) > 0.5) {
             mapView.controller.setZoom(targetZoom)
             lastZoomLevel = targetZoom
@@ -259,54 +608,43 @@ class MapFragment : Fragment() {
         mapView.invalidate()
     }
 
-    private fun setupChart() {
-        chart.apply {
-            description.isEnabled = false
-            setTouchEnabled(false)
-            isDragEnabled = false
-            setScaleEnabled(false)
-            legend.isEnabled = false
-            xAxis.isEnabled = false
-            axisLeft.apply {
-                setDrawLabels(true)
-                textColor = Color.WHITE
-                textSize = 9f
-                removeAllLimitLines()
-                addLimitLine(LimitLine(Constants.DEFAULT_THRESHOLD_BAIK, getString(R.string.condition_baik)).apply {
-                    lineColor = colorBaik; textColor = colorBaik; textSize = 8f
-                })
-                addLimitLine(LimitLine(Constants.DEFAULT_THRESHOLD_SEDANG, getString(R.string.condition_sedang)).apply {
-                    lineColor = colorSedang; textColor = colorSedang; textSize = 8f
-                })
-                addLimitLine(LimitLine(Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN, getString(R.string.condition_rusak_ringan)).apply {
-                    lineColor = colorRusakBerat; textColor = colorRusakBerat; textSize = 8f
-                })
-            }
-            axisRight.isEnabled = false
-            setBackgroundColor(Color.argb(128, 255, 255, 255))
-            setNoDataText(getString(R.string.chart_no_data))
-            setNoDataTextColor(Color.WHITE)
-        }
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Chart
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun updateChart(history: List<Float>) {
-        Timber.d("updateChart called, size=${history.size}, last=${history.lastOrNull()}")
         if (!isChartVisible || history.isEmpty()) return
 
         val entries = history.mapIndexed { index, value ->
             Entry(index.toFloat(), value)
         }
+
+        val lastVal = history.lastOrNull() ?: 0f
+        val lineColor = getConditionColor(lastVal)
+
         val dataSet = LineDataSet(entries, getString(R.string.chart_z_label)).apply {
-            color = colorDefault
+            color = lineColor
             setDrawCircles(false)
             lineWidth = 2.5f
             mode = LineDataSet.Mode.CUBIC_BEZIER
             setDrawFilled(true)
-            fillAlpha = 40
-            fillColor = colorDefault
-            val lastVal = history.lastOrNull() ?: 0f
-            color = getConditionColor(lastVal)
+            fillAlpha = 60
+            fillColor = lineColor
+            setDrawValues(false)
+            highLightColor = Color.WHITE
         }
+
+        // Update badge kondisi di header chart
+        binding.tvChartConditionBadge.apply {
+            text = when {
+                lastVal < viewModel.thresholdBaik.value -> getString(R.string.condition_baik)
+                lastVal < viewModel.thresholdSedang.value -> getString(R.string.condition_sedang)
+                lastVal < viewModel.thresholdRusakRingan.value -> getString(R.string.condition_rusak_ringan)
+                else -> "Rusak Berat"
+            }
+            setTextColor(lineColor)
+        }
+
         chart.data = LineData(dataSet)
         chart.notifyDataSetChanged()
         chart.invalidate()
@@ -325,49 +663,10 @@ class MapFragment : Fragment() {
         }
     }
 
-    private fun setupClickListeners() {
-        fabSurvey.setOnClickListener { handleSurveyButtonClick() }
-        fabStop.setOnClickListener { showStopSurveyConfirmation() }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Survey dialogs
+    // ─────────────────────────────────────────────────────────────────────────
 
-        fabToggleChart.setOnClickListener {
-            isChartVisible = !isChartVisible
-            binding.chartContainer.visibility = if (isChartVisible) View.VISIBLE else View.GONE
-            fabToggleChart.setImageResource(
-                if (isChartVisible) R.drawable.ic_chart else R.drawable.ic_chart_off
-            )
-        }
-
-        fabCamera.setOnClickListener {
-            if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
-                openCamera()
-            } else {
-                showToast(getString(R.string.survey_not_active))
-            }
-        }
-
-        fabVoice.setOnClickListener {
-            if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
-                openVoiceRecorder()
-            } else {
-                showToast(getString(R.string.survey_not_active))
-            }
-        }
-
-        fabCondition.setOnClickListener { showConditionPicker() }
-        fabSurface.setOnClickListener { showSurfacePicker() }
-
-        fabToggleOrientation.setOnClickListener {
-            isOrientationEnabled = !isOrientationEnabled
-            if (isOrientationEnabled) {
-                showToast(getString(R.string.orientation_enabled))
-            } else {
-                showToast(getString(R.string.orientation_disabled))
-                mapView.setMapOrientation(0f)
-            }
-        }
-    }
-
-    // Tambahkan fungsi handleSurveyButtonClick
     private fun handleSurveyButtonClick() {
         when {
             !viewModel.isSurveying.value -> showStartSurveyDialog()
@@ -378,50 +677,43 @@ class MapFragment : Fragment() {
 
     private fun showStartSurveyDialog() {
         val view = layoutInflater.inflate(R.layout.dialog_start_survey, null)
-        val etSurveyor = view.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etSurveyorName)
-        val etRoadName = view.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etRoadName)
-
+        val etSurveyor = view.findViewById<com.google.android.material.textfield.TextInputEditText>(
+            R.id.etSurveyorName
+        )
+        val etRoadName = view.findViewById<com.google.android.material.textfield.TextInputEditText>(
+            R.id.etRoadName
+        )
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.start_survey))
             .setView(view)
             .setPositiveButton(getString(R.string.start)) { _, _ ->
                 val surveyor = etSurveyor?.text?.toString()?.trim() ?: ""
                 val roadName = etRoadName?.text?.toString()?.trim() ?: ""
-
                 if (surveyor.isBlank()) {
                     showToast("Nama surveyor wajib diisi")
                     return@setPositiveButton
                 }
-
                 viewModel.startSurvey(surveyor, roadName)
             }
             .setNegativeButton(getString(R.string.cancel), null)
             .show()
     }
 
-    private fun openCamera() {
-        showToast("Fitur kamera akan segera hadir")
-        // TODO: implement camera intent
-    }
-
-    private fun openVoiceRecorder() {
-        showToast("Fitur rekam suara akan segera hadir")
-        // TODO: implement voice recorder
-    }
-
     private fun showConditionPicker() {
         val conditions = Condition.values()
         val currentCondition = viewModel.currentCondition.value
         val currentIndex = conditions.indexOf(currentCondition).coerceAtLeast(0)
-
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.pick_condition_title))
-            .setSingleChoiceItems(conditions.map { it.name }.toTypedArray(), currentIndex) { dialog, which ->
+            .setSingleChoiceItems(
+                conditions.map { it.name }.toTypedArray(),
+                currentIndex
+            ) { dialog, which ->
                 val selected = conditions[which]
                 if (!viewModel.checkConditionConsistency(selected)) {
                     MaterialAlertDialogBuilder(requireContext())
                         .setTitle("Peringatan")
-                        .setMessage("Data getaran menunjukkan kondisi yang berbeda. Yakin memilih ${selected.name}?")
+                        .setMessage("Data getaran menunjukkan kondisi berbeda. Yakin memilih ${selected.name}?")
                         .setPositiveButton("Ya") { _, _ ->
                             viewModel.recordCondition(selected)
                             dialog.dismiss()
@@ -431,8 +723,8 @@ class MapFragment : Fragment() {
                 } else {
                     viewModel.recordCondition(selected)
                     dialog.dismiss()
+                    showToast(getString(R.string.condition_selected, selected.name))
                 }
-                showToast(getString(R.string.condition_selected, selected.name))
             }
             .setNegativeButton(getString(R.string.cancel), null)
             .show()
@@ -442,10 +734,12 @@ class MapFragment : Fragment() {
         val surfaces = Surface.values()
         val currentSurface = viewModel.currentSurface.value
         val currentIndex = surfaces.indexOf(currentSurface).coerceAtLeast(0)
-
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.pick_surface_title))
-            .setSingleChoiceItems(surfaces.map { it.name }.toTypedArray(), currentIndex) { dialog, which ->
+            .setSingleChoiceItems(
+                surfaces.map { it.name }.toTypedArray(),
+                currentIndex
+            ) { dialog, which ->
                 val selected = surfaces[which]
                 viewModel.recordSurface(selected)
                 dialog.dismiss()
@@ -477,6 +771,10 @@ class MapFragment : Fragment() {
             .show()
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // UI state helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
     private fun showSurveyFABs(show: Boolean) {
         val visibility = if (show) View.VISIBLE else View.GONE
         fabStop.visibility = visibility
@@ -484,14 +782,17 @@ class MapFragment : Fragment() {
         fabVoice.visibility = visibility
         fabCondition.visibility = visibility
         fabSurface.visibility = visibility
+        binding.chartContainer.visibility = if (show) View.VISIBLE else View.GONE
     }
 
     private fun updateSurveyButton(isSurveying: Boolean, isPaused: Boolean) {
-        fabSurvey.setImageResource(when {
-            !isSurveying -> R.drawable.ic_play
-            isPaused -> R.drawable.ic_play
-            else -> R.drawable.ic_pause
-        })
+        fabSurvey.setImageResource(
+            when {
+                !isSurveying -> R.drawable.ic_play
+                isPaused -> R.drawable.ic_play
+                else -> R.drawable.ic_pause
+            }
+        )
         fabSurvey.backgroundTintList = ContextCompat.getColorStateList(
             requireContext(),
             when {
@@ -506,23 +807,40 @@ class MapFragment : Fragment() {
         Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }
 
+    private fun restoreSurveyState() {
+        val isSurveying = viewModel.isSurveying.value
+        val isPaused = viewModel.isPaused.value
+        updateSurveyButton(isSurveying, isPaused)
+        if (isSurveying) {
+            showSurveyFABs(true)
+            isChartVisible = true
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Observers
+    // ─────────────────────────────────────────────────────────────────────────
+
     @OptIn(FlowPreview::class)
     private fun observeViewModel() {
         combine(viewModel.isSurveying, viewModel.isPaused) { surveying, paused ->
             surveying to paused
         }.onEach { (surveying, paused) ->
             updateSurveyButton(surveying, paused)
-            if (surveying) showSurveyFABs(true)
-            else showSurveyFABs(false)
+            showSurveyFABs(surveying)
+            // Reset chart saat survey berhenti
+            if (!surveying) {
+                chart.clear()
+                chart.setNoDataText(getString(R.string.chart_no_data))
+                chart.invalidate()
+            }
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 
         viewModel.location.onEach { location ->
             location?.let {
                 try {
                     updateMyLocationUI(it)
-                    if (isFollowingGPS) {
-                        smoothFollow(it)
-                    }
+                    if (isFollowingGPS) smoothFollow(it)
                 } catch (e: Exception) {
                     Timber.e(e, "Error updating location UI")
                 }
@@ -548,7 +866,8 @@ class MapFragment : Fragment() {
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 
         viewModel.speed.onEach { speedMs ->
-            binding.tvSpeed.text = getString(R.string.speed_format, (speedMs * 3.6f).toInt())
+            binding.tvSpeed.text =
+                getString(R.string.speed_format, (speedMs * 3.6f).toInt())
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 
         viewModel.distance.onEach { dist ->
@@ -574,11 +893,6 @@ class MapFragment : Fragment() {
                     if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
                         updateChart(history)
                     }
-                    if (!viewModel.isSurveying.value) {
-                        chart.clear()
-                        chart.setNoDataText(getString(R.string.chart_no_data))
-                        chart.invalidate()
-                    }
                 } catch (e: Exception) {
                     Timber.e(e, "Error updating chart")
                 }
@@ -600,47 +914,12 @@ class MapFragment : Fragment() {
         }.launchIn(viewLifecycleOwner.lifecycleScope)
     }
 
-    private fun restoreSurveyState() {
-        val isSurveying = viewModel.isSurveying.value
-        val isPaused = viewModel.isPaused.value
-        updateSurveyButton(isSurveying, isPaused)
-        if (isSurveying) {
-            showSurveyFABs(true)
-            binding.chartContainer.visibility = View.VISIBLE
-            isChartVisible = true
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        mapView.onResume()
-        sensorGateway.startListening()
-        if (hasLocationPermission()) {
-            viewModel.startLocationTracking()
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        mapView.onPause()
-        if (!viewModel.isSurveying.value) {
-            sensorGateway.stopListening()
-            viewModel.stopLocationTracking()
-        }
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        mapView.overlays.clear()
-        if (!viewModel.isSurveying.value) {
-            sensorGateway.stopListening()
-            viewModel.stopLocationTracking()
-        }
-        _binding = null
-    }
-
     private fun hasLocationPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat.checkSelfPermission(
+            requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(
+                    requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
     }
 }

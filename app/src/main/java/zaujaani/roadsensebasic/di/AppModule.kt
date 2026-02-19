@@ -12,6 +12,7 @@ import zaujaani.roadsensebasic.data.repository.TelemetryRepository
 import zaujaani.roadsensebasic.domain.engine.ConfidenceCalculator
 import zaujaani.roadsensebasic.domain.engine.SurveyEngine
 import zaujaani.roadsensebasic.domain.engine.VibrationAnalyzer
+import zaujaani.roadsensebasic.gateway.BluetoothGateway
 import zaujaani.roadsensebasic.gateway.GPSGateway
 import zaujaani.roadsensebasic.gateway.SensorGateway
 import javax.inject.Singleton
@@ -48,6 +49,12 @@ object AppModule {
     @Singleton
     fun provideSensorGateway(@ApplicationContext context: Context): SensorGateway {
         return SensorGateway(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideBluetoothGateway(@ApplicationContext context: Context): BluetoothGateway {
+        return BluetoothGateway(context)
     }
 
     @Provides

@@ -163,4 +163,21 @@
     <string name="orientation_enabled">Orientasi mengikuti GPS aktif</string>
     <string name="orientation_disabled">Orientasi mengikuti GPS mati</string>
     <string name="event_count">Jumlah event</string>
+
+
+    <string name="scan_devices">Scan Perangkat</string>
+    <string name="mac_address_hint">Alamat MAC</string>
+    <string name="connect">Hubungkan</string>
+    <string name="disconnect">Putuskan</string>
+    <string name="command_hint">Perintah</string>
+    <string name="send_command">Kirim Perintah</string>
+    <string name="received_data">Data Terima:</string>
+    <string name="clear">Bersihkan</string>
+    <string name="enter_mac_address">Masukkan alamat MAC</string>
+    <string name="no_devices_found">Tidak ada perangkat ditemukan</string>
+    <string name="connected">Terhubung</string>
+    <string name="connecting">Menghubungkan...</string>
+    <string name="disconnected">Terputus</string>
+    <string name="error">Error</string>
+    <string name="select_device">Pilih Perangkat</string>
 </resources>
