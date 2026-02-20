@@ -143,6 +143,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.3.3")
     implementation("androidx.camera:camera-view:1.3.3")
     implementation("androidx.media:media:1.7.0")
+    implementation("com.itextpdf:itext7-core:7.2.5")
 
 
 

@@ -9,9 +9,7 @@ import dagger.hilt.components.SingletonComponent
 import zaujaani.roadsensebasic.data.local.RoadSenseDatabase
 import zaujaani.roadsensebasic.data.repository.SurveyRepository
 import zaujaani.roadsensebasic.data.repository.TelemetryRepository
-import zaujaani.roadsensebasic.domain.engine.ConfidenceCalculator
-import zaujaani.roadsensebasic.domain.engine.SurveyEngine
-import zaujaani.roadsensebasic.domain.engine.VibrationAnalyzer
+import zaujaani.roadsensebasic.domain.engine.*
 import zaujaani.roadsensebasic.gateway.BluetoothGateway
 import zaujaani.roadsensebasic.gateway.GPSGateway
 import zaujaani.roadsensebasic.gateway.SensorGateway
@@ -71,19 +69,27 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideSDICalculator(): SDICalculator {
+        return SDICalculator()
+    }
+
+    @Provides
+    @Singleton
     fun provideSurveyEngine(
         sensorGateway: SensorGateway,
         telemetryRepository: TelemetryRepository,
         surveyRepository: SurveyRepository,
         vibrationAnalyzer: VibrationAnalyzer,
-        confidenceCalculator: ConfidenceCalculator
+        confidenceCalculator: ConfidenceCalculator,
+        sdiCalculator: SDICalculator
     ): SurveyEngine {
         return SurveyEngine(
             sensorGateway = sensorGateway,
             telemetryRepository = telemetryRepository,
             surveyRepository = surveyRepository,
             vibrationAnalyzer = vibrationAnalyzer,
-            confidenceCalculator = confidenceCalculator
+            confidenceCalculator = confidenceCalculator,
+            sdiCalculator = sdiCalculator
         )
     }
 }

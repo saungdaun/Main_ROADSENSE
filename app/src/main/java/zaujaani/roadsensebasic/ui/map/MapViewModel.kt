@@ -21,8 +21,10 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import zaujaani.roadsensebasic.data.local.entity.Condition
 import zaujaani.roadsensebasic.data.local.entity.Surface
+import zaujaani.roadsensebasic.data.local.entity.SurveyMode
 import zaujaani.roadsensebasic.data.repository.SurveyRepository
 import zaujaani.roadsensebasic.domain.engine.SurveyEngine
+import zaujaani.roadsensebasic.domain.model.LocationData
 import zaujaani.roadsensebasic.gateway.GPSGateway
 import zaujaani.roadsensebasic.service.SurveyForegroundService
 import zaujaani.roadsensebasic.util.Constants
@@ -38,40 +40,32 @@ class MapViewModel @Inject constructor(
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
 
-    // ── Location & Sensor ─────────────────────────────────────────────────────
-
+    // ── Location & Sensor (UI langsung pakai Location Android) ─────────────
     private val _location = MutableStateFlow<Location?>(null)
     val location: StateFlow<Location?> = _location.asStateFlow()
 
     private val _speed = MutableStateFlow(0f)
     val speed: StateFlow<Float> = _speed.asStateFlow()
 
-    /**
-     * Jarak kumulatif — langsung dari SurveyEngine (single source of truth).
-     * FIX: sebelumnya ViewModel punya _distance sendiri yang tidak pernah
-     * di-update dari engine, sehingga UI selalu menampilkan 0.
-     */
+    // Data dari engine (single source of truth)
     val distance: StateFlow<Double> = surveyEngine.currentDistance
-
     val vibration: StateFlow<Float> = surveyEngine.currentVibration
 
-    // ── Survey State ──────────────────────────────────────────────────────────
-
+    // ── Survey State ──────────────────────────────────────────────────────
     val isSurveying: StateFlow<Boolean> = surveyEngine.isSurveying
     val isPaused: StateFlow<Boolean> = surveyEngine.isPaused
     val vibrationHistory: StateFlow<List<Float>> = surveyEngine.vibrationHistory
     val roadName: StateFlow<String> = surveyEngine.roadName
+    val mode: StateFlow<SurveyMode> = surveyEngine.mode
 
-    // ── Condition & Surface ───────────────────────────────────────────────────
-
+    // ── Condition & Surface (dari engine + mirror untuk UI) ───────────────
     private val _currentCondition = MutableStateFlow(Condition.BAIK)
     val currentCondition: StateFlow<Condition> = _currentCondition.asStateFlow()
 
     private val _currentSurface = MutableStateFlow(Surface.ASPAL)
     val currentSurface: StateFlow<Surface> = _currentSurface.asStateFlow()
 
-    // ── Thresholds ────────────────────────────────────────────────────────────
-
+    // ── Thresholds (dari Preferences) ─────────────────────────────────────
     private val _thresholdBaik = MutableStateFlow(Constants.DEFAULT_THRESHOLD_BAIK)
     val thresholdBaik: StateFlow<Float> = _thresholdBaik.asStateFlow()
 
@@ -81,17 +75,13 @@ class MapViewModel @Inject constructor(
     private val _thresholdRusakRingan = MutableStateFlow(Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN)
     val thresholdRusakRingan: StateFlow<Float> = _thresholdRusakRingan.asStateFlow()
 
-    // ── Distance Trigger ──────────────────────────────────────────────────────
-
+    // ── Trigger jarak (dari engine) ──────────────────────────────────────
     private val _distanceTrigger = MutableSharedFlow<Double>(extraBufferCapacity = 5)
     val distanceTrigger = _distanceTrigger.asSharedFlow()
 
-    // ── Location Job ──────────────────────────────────────────────────────────
-
     private var locationTrackingJob: Job? = null
 
-    // ─────────────────────────────────────────────────────────────────────────
-
+    // ─────────────────────────────────────────────────────────────────────
     init {
         collectPreferences()
         collectDistanceTrigger()
@@ -117,8 +107,7 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    // ── Location Tracking ─────────────────────────────────────────────────────
-
+    // ── Location Tracking (teruskan ke engine dengan LocationData) ───────
     fun startLocationTracking() {
         if (locationTrackingJob?.isActive == true) return
         locationTrackingJob = gpsGateway.getLocationFlow()
@@ -126,8 +115,14 @@ class MapViewModel @Inject constructor(
             .onEach { loc ->
                 _location.value = loc
                 _speed.value = loc.speed
-                // FIX UTAMA: teruskan ke engine agar jarak & telemetri dihitung
-                surveyEngine.updateLocation(loc)
+                val locationData = LocationData(
+                    latitude = loc.latitude,
+                    longitude = loc.longitude,
+                    altitude = loc.altitude,
+                    speed = loc.speed,
+                    accuracy = loc.accuracy
+                )
+                surveyEngine.updateLocation(locationData)
             }
             .launchIn(viewModelScope)
     }
@@ -137,11 +132,10 @@ class MapViewModel @Inject constructor(
         locationTrackingJob = null
     }
 
-    // ── Survey Lifecycle ──────────────────────────────────────────────────────
-
-    fun startSurvey(surveyorName: String, roadName: String) {
+    // ── Survey Lifecycle ─────────────────────────────────────────────────
+    fun startSurvey(surveyorName: String, roadName: String, mode: SurveyMode) {
         viewModelScope.launch {
-            surveyEngine.startNewSession(surveyorName, roadName)
+            surveyEngine.startNewSession(surveyorName, roadName, mode)
             _currentCondition.value = Condition.BAIK
             _currentSurface.value = Surface.ASPAL
             startForegroundService()
@@ -175,8 +169,7 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    // ── Event Recording ───────────────────────────────────────────────────────
-
+    // ── Event Recording ──────────────────────────────────────────────────
     fun recordCondition(condition: Condition) {
         surveyEngine.recordConditionChange(condition)
         _currentCondition.value = condition
@@ -195,13 +188,11 @@ class MapViewModel @Inject constructor(
         surveyEngine.recordVoice(path, notes)
     }
 
-    // ── Validation ────────────────────────────────────────────────────────────
-
+    // ── Validation ───────────────────────────────────────────────────────
     fun checkConditionConsistency(condition: Condition): Boolean =
         surveyEngine.checkConditionConsistency(condition)
 
-    // ── Foreground Service ────────────────────────────────────────────────────
-
+    // ── Foreground Service ───────────────────────────────────────────────
     private fun startForegroundService() {
         val intent = Intent(context, SurveyForegroundService::class.java).apply {
             action = Constants.ACTION_START

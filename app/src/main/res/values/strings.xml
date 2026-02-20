@@ -191,7 +191,7 @@
 
     <string name="watermark_app_name">RoadSense SaungDaun</string>
     <string name="watermark_distance">Jarak: %d m</string>
-    <string name="watermark_coord">Lat: %s, Lon: %s</string>
+
 
     <!-- Baru - tambahkan di strings.xml -->
     <string name="condition_rusak_berat">Rusak Berat</string>
@@ -201,4 +201,21 @@
     <string name="condition_mismatch_message">Data getaran menunjukkan kondisi berbeda. Yakin memilih %s?</string>
     <string name="surveyor_name_required">Nama surveyor wajib diisi</string>
     <string name="distance_reached_prompt">Jarak %d m tercapai. Ambil foto?</string>
+    <string name="mode_general">Umum</string>
+    <string name="mode_sdi">SDI</string>
+    <string name="select_mode">Pilih Mode</string>
+
+    <string name="distress_type_hint">Jenis Kerusakan</string>
+    <string name="severity_label">Tingkat Keparahan</string>
+    <string name="severity_low">Ringan</string>
+    <string name="severity_medium">Sedang</string>
+    <string name="severity_high">Berat</string>
+    <string name="unit_length">Panjang (m)</string>
+    <string name="unit_area">Luas (m²)</string>
+    <string name="custom_value_hint">Isi sendiri</string>
+    <string name="add_photo">Tambah Foto</string>
+    <string name="record_voice">Rekam Suara</string>
+    <string name="sdi_average">SDI Rata-rata: %d (%s)</string>
+    <string name="watermark_coord" formatted="false">Lat: %s, Lon: %s</string>
+    <string name="export_pdf">Ekspor PDF</string>
 </resources>

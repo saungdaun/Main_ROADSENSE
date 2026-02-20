@@ -5,6 +5,7 @@
     android:orientation="vertical"
     android:padding="20dp">
 
+
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -31,5 +32,27 @@
             android:hint="@string/road_name_hint"
             android:inputType="text" />
     </com.google.android.material.textfield.TextInputLayout>
+    <RadioGroup
+        android:id="@+id/radioGroupMode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+
+        <RadioButton
+            android:id="@+id/radioGeneral"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Umum"
+            android:checked="true" />
+
+        <RadioButton
+            android:id="@+id/radioSdi"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="SDI" />
+    </RadioGroup>
 
 </LinearLayout>

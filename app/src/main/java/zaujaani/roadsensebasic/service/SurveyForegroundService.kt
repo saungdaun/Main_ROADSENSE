@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.location.Location
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.onEach
 import timber.log.Timber
 import zaujaani.roadsensebasic.R
 import zaujaani.roadsensebasic.domain.engine.SurveyEngine
+import zaujaani.roadsensebasic.domain.model.LocationData
 import zaujaani.roadsensebasic.gateway.GPSGateway
 import zaujaani.roadsensebasic.gateway.SensorGateway
 import zaujaani.roadsensebasic.ui.main.MainActivity
@@ -95,7 +97,7 @@ class SurveyForegroundService : android.app.Service() {
                 // service tetap berjalan, tidak perlu crash
             }
             .onEach { location ->
-                surveyEngine.updateLocation(location)
+                surveyEngine.updateLocation(location.toLocationData())
                 // Throttle update notifikasi maksimal 3 detik sekali
                 val now = System.currentTimeMillis()
                 if (now - lastNotificationUpdate > 3000) {
@@ -221,4 +223,13 @@ class SurveyForegroundService : android.app.Service() {
         val manager = ContextCompat.getSystemService(this, NotificationManager::class.java)
         manager?.notify(Constants.NOTIFICATION_ID, notification)
     }
+
+    // Extension function to convert Location to LocationData
+    private fun Location.toLocationData(): LocationData = LocationData(
+        latitude = this.latitude,
+        longitude = this.longitude,
+        altitude = this.altitude,
+        speed = this.speed,
+        accuracy = this.accuracy
+    )
 }

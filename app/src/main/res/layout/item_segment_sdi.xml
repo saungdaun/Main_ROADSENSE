@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="12dp"
+    android:background="?selectableItemBackground">
+
+    <View
+        android:id="@+id/viewColorIndicator"
+        android:layout_width="8dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="12dp"
+        android:background="@color/green" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvSta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="STA 0+000 – 0+100"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvSdiScore"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SDI 32"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tvDistressCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="3 kerusakan"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+</LinearLayout>
