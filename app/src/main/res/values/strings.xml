@@ -15,37 +15,29 @@
     <string name="title_map">Map</string>
     <string name="title_summary">Summary</string>
     <string name="title_settings">Settings</string>
-
     <!-- Map screen -->
     <string name="start_survey">Mulai Survey</string>
     <string name="stop_survey">Hentikan Survey</string>
-
     <!-- Units -->
     <string name="unit_kmh">km/h</string>
     <string name="unit_m">m</string>
     <string name="unit_km">km</string>
     <string name="unit_g">g</string>
     <string name="gps_accuracy">Acc: %.1f m</string>
-
     <string name="speed_format">%d km/h</string>
     <string name="distance_m_format">%d m</string>
     <string name="distance_km_format">%.2f km</string>
     <string name="vibration_format">%.2f g</string>
     <string name="accuracy_format">Acc: %.1f m</string>
-
     <string name="confidence_value">Confidence: %d%%</string>
     <string name="condition_auto">Kondisi otomatis: %s</string>
-
     <string name="permission_denied">Izin ditolak: %s</string>
     <string name="gps_accuracy_low">Akurasi GPS rendah</string>
     <string name="gps_accuracy_fair">Akurasi GPS cukup</string>
     <string name="gps_accuracy_good">Akurasi GPS baik</string>
-    <string name="camera_permission_required">Izin kamera diperlukan</string>
+
     <string name="take_photo">Ambil Foto</string>
     <string name="take">Ambil</string>
-    <string name="photo_saved">Foto tersimpan</string>
-    <string name="photo_failed">Gagal mengambil foto</string>
-    <string name="microphone_permission_required">Izin mikrofon diperlukan</string>
     <string name="recording_failed">Gagal memulai rekaman</string>
     <string name="play_recording">Putar Rekaman</string>
     <string name="stop">Stop</string>
@@ -56,15 +48,12 @@
     <string name="segments_prefix">Segmen: %d</string>
     <string name="confidence_avg_prefix">Confidence rata-rata: %d%%</string>
     <string name="device_prefix">Device: %s</string>
-
     <string name="no_sessions">Belum ada survey</string>
-
     <string name="distance_m">Jarak: %d m</string>
     <string name="distance_km">Jarak: %.2f km</string>
     <string name="segments_count">Segmen: %d</string>
     <string name="confidence_avg">Confidence rata-rata: %d%%</string>
     <string name="device_model">Device: %s</string>
-
     <string name="confidence_label">Confidence:</string>
     <string name="road_name_hint">Nama Ruas</string>
     <string name="condition_hint">Kondisi Visual</string>
@@ -128,14 +117,12 @@
     <string name="delete_session_confirm">Apakah Anda yakin ingin menghapus survey ini? Semua data segmen akan ikut terhapus.</string>
     <string name="cancel">Batal</string>
     <string name="ok">OK</string>
-
     <!-- Tambahan -->
     <string name="threshold_baik_label">Baik: %s g</string>
     <string name="threshold_sedang_label">Sedang: %s g</string>
     <string name="threshold_rusak_label">Rusak Ringan: %s g</string>
     <string name="gps_interval_label">Interval GPS: %d ms</string>
     <string name="menu_bluetooth">Bluetooth</string>
-
     <!-- strings.xml tambahan -->
     <string name="segment_start_title">Mulai: %s</string>
     <string name="segment_marker_snippet" formatted="false">%s, %s, %d m</string>
@@ -144,7 +131,7 @@
     <string name="condition_baik">Baik</string>
     <string name="condition_sedang">Sedang</string>
     <string name="condition_rusak_ringan">Rusak Ringan</string>
-    <string name="chart_no_data">Tunggu data...</string>
+    <string name="chart_no_data">Tunggu data…</string>
     <string name="chart_z_label">Z-Axis (g)</string>
     <string name="survey_not_active">Survey tidak aktif</string>
     <string name="segment_started_toast">Segmen dimulai</string>
@@ -163,8 +150,6 @@
     <string name="orientation_enabled">Orientasi mengikuti GPS aktif</string>
     <string name="orientation_disabled">Orientasi mengikuti GPS mati</string>
     <string name="event_count">Jumlah event</string>
-
-
     <string name="scan_devices">Scan Perangkat</string>
     <string name="mac_address_hint">Alamat MAC</string>
     <string name="connect">Hubungkan</string>
@@ -176,11 +161,10 @@
     <string name="enter_mac_address">Masukkan alamat MAC</string>
     <string name="no_devices_found">Tidak ada perangkat ditemukan</string>
     <string name="connected">Terhubung</string>
-    <string name="connecting">Menghubungkan...</string>
+    <string name="connecting">Menghubungkan…</string>
     <string name="disconnected">Terputus</string>
     <string name="error">Error</string>
     <string name="select_device">Pilih Perangkat</string>
-
     <string name="view_photos">Lihat Foto</string>
     <string name="no_photos">Tidak ada foto</string>
     <string name="photo_file_not_found">File foto tidak ditemukan</string>
@@ -191,8 +175,21 @@
 
     <string name="watermark_app_name">RoadSense SaungDaun</string>
     <string name="watermark_distance">Jarak: %d m</string>
-
-
+    <string name="photo_saved">Foto tersimpan</string>
+    <string name="file_not_found">File foto tidak ditemukan</string>
+    <string name="photo_failed">Gagal mengambil foto</string>
+    <string name="camera_permission_required">Izin kamera diperlukan</string>
+    <string name="microphone_permission_required">Izin mikrofon diperlukan</string>
+    <string name="distress_saved">Kerusakan tersimpan</string>
+    <string name="quick_5">5</string>
+    <string name="quick_10">10</string>
+    <string name="quick_20">20</string>
+    <string name="quick_50">50</string>
+    <string name="unit_default">Panjang/Luas</string>
+    <string name="select_distress_type">Pilih jenis kerusakan</string>
+    <string name="select_severity">Pilih tingkat keparahan</string>
+    <string name="enter_length_area">Masukkan panjang/luas</string>
+    <string name="invalid_data">Data tidak valid</string>
     <!-- Baru - tambahkan di strings.xml -->
     <string name="condition_rusak_berat">Rusak Berat</string>
     <string name="audio_saved">Rekaman tersimpan</string>
@@ -204,7 +201,6 @@
     <string name="mode_general">Umum</string>
     <string name="mode_sdi">SDI</string>
     <string name="select_mode">Pilih Mode</string>
-
     <string name="distress_type_hint">Jenis Kerusakan</string>
     <string name="severity_label">Tingkat Keparahan</string>
     <string name="severity_low">Ringan</string>
@@ -215,7 +211,11 @@
     <string name="custom_value_hint">Isi sendiri</string>
     <string name="add_photo">Tambah Foto</string>
     <string name="record_voice">Rekam Suara</string>
-    <string name="sdi_average">SDI Rata-rata: %d (%s)</string>
+    <string name="sdi_average">
+    SDI Rata-rata: %d (%s)
+    </string>
     <string name="watermark_coord" formatted="false">Lat: %s, Lon: %s</string>
     <string name="export_pdf">Ekspor PDF</string>
+    <string name="photo_thumbnail">Thumbnail foto</string>
+
 </resources>

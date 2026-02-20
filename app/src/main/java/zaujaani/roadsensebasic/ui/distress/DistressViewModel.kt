@@ -10,6 +10,7 @@ import timber.log.Timber
 import zaujaani.roadsensebasic.data.local.entity.DistressType
 import zaujaani.roadsensebasic.data.local.entity.Severity
 import zaujaani.roadsensebasic.domain.engine.SurveyEngine
+import zaujaani.roadsensebasic.domain.model.LocationData
 import javax.inject.Inject
 
 sealed class SaveResult {
@@ -26,6 +27,12 @@ class DistressViewModel @Inject constructor(
     private val _saveResult = MutableLiveData<SaveResult>()
     val saveResult: LiveData<SaveResult> = _saveResult
 
+    fun getCurrentDistance(): Double = surveyEngine.getCurrentDistance()
+
+    fun getCurrentLocation(): LocationData? = surveyEngine.getLastLocation()
+
+    fun getRoadName(): String = surveyEngine.roadName.value
+
     fun saveDistress(
         type: DistressType,
         severity: Severity,
@@ -37,7 +44,6 @@ class DistressViewModel @Inject constructor(
         viewModelScope.launch {
             _saveResult.value = SaveResult.Loading
 
-            // Validasi dasar
             if (lengthOrArea <= 0) {
                 _saveResult.value = SaveResult.Error("Panjang/Luas harus lebih dari 0")
                 return@launch

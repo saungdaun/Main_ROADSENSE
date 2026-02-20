@@ -395,10 +395,15 @@ class MapFragment : Fragment() {
                 fabCondition.visibility = if (isSdi) View.GONE else View.VISIBLE
                 fabSurface.visibility = if (isSdi) View.GONE else View.VISIBLE
                 fabAddDistress.visibility = if (isSdi) View.VISIBLE else View.GONE
+                // Sembunyikan kamera dan voice umum saat mode SDI
+                fabCamera.visibility = if (isSdi) View.GONE else View.VISIBLE
+                fabVoice.visibility = if (isSdi) View.GONE else View.VISIBLE
             } else {
                 fabCondition.visibility = View.GONE
                 fabSurface.visibility = View.GONE
                 fabAddDistress.visibility = View.GONE
+                fabCamera.visibility = View.GONE
+                fabVoice.visibility = View.GONE
             }
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 

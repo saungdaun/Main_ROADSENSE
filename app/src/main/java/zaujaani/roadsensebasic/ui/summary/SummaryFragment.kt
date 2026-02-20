@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import timber.log.Timber
 import zaujaani.roadsensebasic.R
 import zaujaani.roadsensebasic.data.local.entity.EventType
 import zaujaani.roadsensebasic.data.local.entity.SurveyMode
@@ -210,11 +211,22 @@ class SummaryFragment : Fragment() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_sdi_detail, null)
         val tvAvgSdi = dialogView.findViewById<TextView>(R.id.tvAvgSdi)
         val progressBar = dialogView.findViewById<View>(R.id.progressBar)
+        val tvTotalDistance = dialogView.findViewById<TextView>(R.id.tvTotalDistance)
+        val tvTotalSegments = dialogView.findViewById<TextView>(R.id.tvTotalSegments)
+        val tvTotalDistress = dialogView.findViewById<TextView>(R.id.tvTotalDistress)
         val recyclerView = dialogView.findViewById<RecyclerView>(R.id.recyclerViewSegments)
 
         tvAvgSdi.text = getString(R.string.sdi_average, detail.averageSdi, SDICalculator.categorizeSDI(detail.averageSdi))
-        // Ganti getCategoryColor dengan fungsi lokal
         progressBar.setBackgroundColor(getSdiColor(detail.averageSdi))
+
+        val totalDistText = if (detail.totalDistance < 1000) {
+            getString(R.string.distance_m_format, detail.totalDistance.toInt())
+        } else {
+            getString(R.string.distance_km_format, detail.totalDistance / 1000.0)
+        }
+        tvTotalDistance.text = "Total Panjang: $totalDistText"
+        tvTotalSegments.text = "Total Segmen: ${detail.segmentsSdi.size}"
+        tvTotalDistress.text = "Total Kerusakan: ${detail.distressItems.size}"
 
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         val adapter = SegmentSdiAdapter { segment ->
@@ -223,7 +235,7 @@ class SummaryFragment : Fragment() {
         recyclerView.adapter = adapter
         adapter.submitList(detail.segmentsSdi)
 
-        MaterialAlertDialogBuilder(requireContext())
+        val builder = MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.detail_title) + " (SDI)")
             .setView(dialogView)
             .setPositiveButton(getString(R.string.export_gpx)) { _, _ ->
@@ -232,8 +244,18 @@ class SummaryFragment : Fragment() {
             .setNeutralButton(getString(R.string.export_csv)) { _, _ ->
                 exportSession(detail.session, "csv")
             }
-            .setNegativeButton(getString(R.string.close), null)
-            .show()
+
+        val allPhotoItems = detail.distressItems.filter { it.photoPath.isNotBlank() }
+        Timber.d("SDI dialog: found ${allPhotoItems.size} photo items")
+        if (allPhotoItems.isNotEmpty()) {
+            builder.setNegativeButton("Lihat Semua Foto (${allPhotoItems.size})") { _, _ ->
+                showDistressPhotoSlider(allPhotoItems, 0)
+            }
+        } else {
+            builder.setNegativeButton(getString(R.string.close), null)
+        }
+
+        builder.show()
     }
 
     private fun showSegmentDetail(segment: zaujaani.roadsensebasic.data.local.entity.SegmentSdi, distressItems: List<zaujaani.roadsensebasic.data.local.entity.DistressItem>) {
@@ -254,14 +276,68 @@ class SummaryFragment : Fragment() {
             sb.appendLine("Tidak ada kerusakan.")
         }
 
-        MaterialAlertDialogBuilder(requireContext())
+        val photoItems = distressItems.filter { it.photoPath.isNotBlank() }
+        val builder = MaterialAlertDialogBuilder(requireContext())
             .setTitle("Detail Segmen")
             .setMessage(sb.toString())
             .setPositiveButton("OK", null)
+        if (photoItems.isNotEmpty()) {
+            builder.setNeutralButton("Lihat Foto (${photoItems.size})") { _, _ ->
+                showDistressPhotoSlider(photoItems, 0)
+            }
+        }
+        builder.show()
+    }
+
+    // ── PHOTO SLIDER UNTUK DISTRESS ───────────────────────────────────────
+
+    private fun showDistressPhotoSlider(photos: List<zaujaani.roadsensebasic.data.local.entity.DistressItem>, startIndex: Int) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_photo_slider, null)
+        val imageView = dialogView.findViewById<ImageView>(R.id.ivPhoto)
+        val tvCounter = dialogView.findViewById<TextView>(R.id.tvCounter)
+        val btnPrev = dialogView.findViewById<MaterialButton>(R.id.btnPrev)
+        val btnNext = dialogView.findViewById<MaterialButton>(R.id.btnNext)
+
+        var currentIndex = startIndex
+
+        fun loadPhoto(index: Int) {
+            val item = photos[index]
+            val file = File(item.photoPath)
+            if (file.exists()) {
+                val bitmap = BitmapFactory.decodeFile(item.photoPath)
+                imageView.setImageBitmap(bitmap)
+                tvCounter.text = "${index + 1}/${photos.size} - STA ${item.sta}"
+            } else {
+                Toast.makeText(requireContext(), "File foto tidak ditemukan", Toast.LENGTH_SHORT).show()
+            }
+            btnPrev.isEnabled = index > 0
+            btnNext.isEnabled = index < photos.size - 1
+        }
+
+        btnPrev.setOnClickListener {
+            if (currentIndex > 0) {
+                currentIndex--
+                loadPhoto(currentIndex)
+            }
+        }
+
+        btnNext.setOnClickListener {
+            if (currentIndex < photos.size - 1) {
+                currentIndex++
+                loadPhoto(currentIndex)
+            }
+        }
+
+        loadPhoto(currentIndex)
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.photo_preview_title))
+            .setView(dialogView)
+            .setPositiveButton(getString(R.string.close), null)
             .show()
     }
 
-    // ── PHOTO SLIDER ──────────────────────────────────────────────────────
+    // ── PHOTO SLIDER UNTUK UMUM ───────────────────────────────────────────
 
     private fun showPhotoSlider(photos: List<zaujaani.roadsensebasic.data.local.entity.RoadEvent>, startIndex: Int) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_photo_slider, null)
@@ -385,11 +461,11 @@ class SummaryFragment : Fragment() {
 
     // Helper untuk mendapatkan warna berdasarkan nilai SDI (UI layer)
     private fun getSdiColor(sdi: Int): Int = when (sdi) {
-        in 0..20 -> android.graphics.Color.GREEN
-        in 21..40 -> android.graphics.Color.parseColor("#8BC34A")
-        in 41..60 -> android.graphics.Color.YELLOW
-        in 61..80 -> android.graphics.Color.parseColor("#FF9800")
-        else -> android.graphics.Color.RED
+        in 0..20 -> Color.GREEN
+        in 21..40 -> Color.parseColor("#8BC34A")
+        in 41..60 -> Color.YELLOW
+        in 61..80 -> Color.parseColor("#FF9800")
+        else -> Color.RED
     }
 
     override fun onDestroyView() {

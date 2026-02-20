@@ -45,8 +45,7 @@ data class SessionDetailUi(
 class SummaryViewModel @Inject constructor(
     private val surveyRepository: SurveyRepository,
     private val telemetryRepository: TelemetryRepository,
-    @param:ApplicationContext
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _sessions = MutableLiveData<List<SessionWithCount>>()
@@ -217,6 +216,7 @@ class SummaryViewModel @Inject constructor(
             }
         }
     }
+
     fun exportSessionToPdf(sessionId: Long, callback: (File?) -> Unit) {
         viewModelScope.launch {
             try {

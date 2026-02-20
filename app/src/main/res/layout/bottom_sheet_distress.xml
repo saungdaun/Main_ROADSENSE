@@ -4,15 +4,20 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="20dp"
+    android:background="@color/surface"
+    android:elevation="8dp">
 
-    <!-- Jenis Kerusakan dengan ExposedDropdownMenu -->
+    <!-- Jenis Kerusakan -->
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="@string/distress_type_hint"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-        android:layout_marginBottom="12dp">
+        android:layout_marginBottom="16dp"
+        app:boxStrokeColor="@color/primary"
+        app:boxStrokeWidth="1.5dp"
+        app:boxStrokeWidthFocused="2dp">
 
         <com.google.android.material.textfield.MaterialAutoCompleteTextView
             android:id="@+id/actvDistressType"
@@ -20,51 +25,36 @@
             android:layout_height="wrap_content"
             android:inputType="none"
             android:dropDownHeight="200dp"
-            android:completionThreshold="1" />
+            android:padding="12dp"
+            android:textSize="16sp"
+            android:fontFamily="sans-serif-medium"
+            android:importantForAutofill="no" />
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- Severity (Toggle Buttons) -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/severity_label"
-        android:textSize="14sp"
-        android:textColor="?android:attr/textColorSecondary"
-        android:layout_marginBottom="8dp" />
-
-    <com.google.android.material.button.MaterialButtonToggleGroup
-        android:id="@+id/toggleSeverity"
+    <!-- Tingkat Keparahan (Dropdown) -->
+    <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:hint="@string/severity_label"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
         android:layout_marginBottom="16dp"
-        app:singleSelection="true">
+        app:boxStrokeColor="@color/primary"
+        app:boxStrokeWidth="1.5dp"
+        app:boxStrokeWidthFocused="2dp">
 
-        <Button
-            android:id="@+id/btnLow"
-            android:layout_width="0dp"
+        <com.google.android.material.textfield.MaterialAutoCompleteTextView
+            android:id="@+id/actvSeverity"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/severity_low"
-            style="?attr/materialButtonOutlinedStyle" />
+            android:inputType="none"
+            android:dropDownHeight="200dp"
+            android:padding="12dp"
+            android:textSize="16sp"
+            android:fontFamily="sans-serif-medium"
+            android:importantForAutofill="no" />
+    </com.google.android.material.textfield.TextInputLayout>
 
-        <Button
-            android:id="@+id/btnMedium"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/severity_medium"
-            style="?attr/materialButtonOutlinedStyle" />
-
-        <Button
-            android:id="@+id/btnHigh"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/severity_high"
-            style="?attr/materialButtonOutlinedStyle" />
-    </com.google.android.material.button.MaterialButtonToggleGroup>
-
-    <!-- Unit Label Dinamis -->
+    <!-- Unit Label Dinamis + Quick Buttons -->
     <TextView
         android:id="@+id/tvUnitLabel"
         android:layout_width="wrap_content"
@@ -72,53 +62,57 @@
         android:text="@string/unit_length"
         android:textSize="14sp"
         android:textStyle="bold"
+        android:textColor="@color/text_primary"
         android:layout_marginBottom="8dp" />
 
-    <!-- Quick Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:layout_marginBottom="8dp">
+        android:layout_marginBottom="12dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnQuick5"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="5"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_marginEnd="4dp" />
+            android:text="@string/quick_5"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_marginEnd="4dp"
+            app:cornerRadius="8dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnQuick10"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="10"
-            style="?attr/materialButtonOutlinedStyle"
+            android:text="@string/quick_10"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginEnd="4dp"
+            app:cornerRadius="8dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnQuick20"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="20"
-            style="?attr/materialButtonOutlinedStyle"
+            android:text="@string/quick_20"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginEnd="4dp"
+            app:cornerRadius="8dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnQuick50"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="50"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_marginStart="4dp" />
+            android:text="@string/quick_50"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_marginStart="4dp"
+            app:cornerRadius="8dp" />
     </LinearLayout>
 
     <!-- Input Custom -->
@@ -127,51 +121,75 @@
         android:layout_height="wrap_content"
         android:hint="@string/custom_value_hint"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="16dp"
+        app:boxStrokeColor="@color/primary"
+        app:boxStrokeWidth="1.5dp"
+        app:boxStrokeWidthFocused="2dp">
 
         <EditText
             android:id="@+id/etLengthArea"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="numberDecimal" />
+            android:inputType="numberDecimal"
+            android:padding="12dp"
+            android:textSize="16sp"
+            android:autofillHints="lengthOrArea" />
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- Foto -->
+    <!-- Foto dan Voice (Icon Buttons) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="12dp">
+        android:layout_marginBottom="16dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnAddPhoto"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/add_photo"
             android:icon="@drawable/ic_camera"
-            style="?attr/materialButtonOutlinedStyle" />
+            app:iconGravity="textStart"
+            android:text="@string/add_photo"
+            android:textSize="14sp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_marginEnd="8dp"
+            app:cornerRadius="8dp"
+            app:iconPadding="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnVoice"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:icon="@drawable/ic_mic"
+            app:iconGravity="textStart"
+            android:text="@string/record_voice"
+            android:textSize="14sp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_marginStart="8dp"
+            app:cornerRadius="8dp"
+            app:iconPadding="8dp" />
+    </LinearLayout>
+
+    <!-- Thumbnail Foto (opsional) -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone"
+        android:id="@+id/photoThumbContainer">
 
         <ImageView
             android:id="@+id/ivPhotoThumb"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="8dp"
-            android:visibility="gone"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
             android:scaleType="centerCrop"
-            android:background="@drawable/photo_thumb_bg" />
-    </LinearLayout>
-
-    <!-- Voice -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnVoice"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/record_voice"
-        android:icon="@drawable/ic_mic"
-        style="?attr/materialButtonOutlinedStyle"
-        android:layout_marginBottom="12dp" />
+            android:background="@drawable/photo_thumb_bg"
+            android:layout_gravity="center_horizontal"
+            android:contentDescription="@string/photo_thumbnail" />
+    </FrameLayout>
 
     <!-- Catatan -->
     <com.google.android.material.textfield.TextInputLayout
@@ -179,14 +197,20 @@
         android:layout_height="wrap_content"
         android:hint="@string/notes_hint"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="20dp"
+        app:boxStrokeColor="@color/primary"
+        app:boxStrokeWidth="1.5dp"
+        app:boxStrokeWidthFocused="2dp">
 
         <EditText
             android:id="@+id/etNotes"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="textMultiLine"
-            android:maxLines="3" />
+            android:maxLines="3"
+            android:padding="12dp"
+            android:textSize="14sp"
+            android:autofillHints="notes" />
     </com.google.android.material.textfield.TextInputLayout>
 
     <!-- Tombol Simpan -->
@@ -196,6 +220,8 @@
         android:layout_height="wrap_content"
         android:text="@string/save"
         android:textSize="16sp"
-        app:icon="@drawable/ic_save" />
+        app:icon="@drawable/ic_save"
+        style="@style/Button.Premium"
+        app:cornerRadius="12dp" />
 
 </LinearLayout>
