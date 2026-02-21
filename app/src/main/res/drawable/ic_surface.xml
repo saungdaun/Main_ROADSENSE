@@ -1,19 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
-    android:viewportHeight="24"
-    android:tint="#000000">
-    <!-- Kotak bawah -->
+    android:viewportHeight="24">
+
+    <!-- Bottom soil layer -->
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M4,16h16v4H4z"/>
-    <!-- Kotak tengah -->
+        android:fillColor="@color/orange_light"
+        android:pathData="M3,15H21V20C21,21 20,22 19,22H5C4,22 3,21 3,20V15Z"/>
+
+    <!-- Middle base layer -->
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M6,10h12v4H6z"/>
-    <!-- Kotak atas -->
+        android:fillColor="@color/gray_light"
+        android:pathData="M3,11H21V15H3V11Z"/>
+
+    <!-- Top surface layer -->
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M8,4h8v4H8z"/>
+        android:fillColor="@color/primary_dark"
+        android:pathData="M3,6H21V11H3V6Z"/>
+
+    <!-- Road marking -->
+    <path
+        android:fillColor="@color/yellow_light"
+        android:pathData="M11,7H13V10H11V7Z"/>
+
 </vector>

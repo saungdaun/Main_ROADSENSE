@@ -2,8 +2,11 @@ package zaujaani.roadsensebasic.data.local.entity
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
+// FIX: tambah indices untuk kolom segmentId yang ada ForeignKey
+// Tanpa ini KSP warning: "may trigger full table scans"
 @Entity(
     tableName = "distress_items",
     foreignKeys = [
@@ -13,6 +16,10 @@ import androidx.room.PrimaryKey
             childColumns = ["segmentId"],
             onDelete = ForeignKey.CASCADE
         )
+    ],
+    indices = [
+        Index(value = ["segmentId"]),
+        Index(value = ["sessionId"])    // sessionId juga sering di-query, worth indexing
     ]
 )
 data class DistressItem(

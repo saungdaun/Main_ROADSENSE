@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,11 +25,22 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * BluetoothGateway v2 — ESP32 SPP Connection Manager
+ *
+ * Fitur baru:
+ * - Auto-switch: saat connect → matikan SensorGateway internal
+ * - Auto-fallback: saat disconnect → nyalakan kembali SensorGateway internal
+ * - Auto-reconnect dengan exponential backoff
+ * - Parsing data ESP32 format: RS2,<ts>,<pulse>,<accelZ>,<vBat>,<temp>
+ * - Feed data ke SensorGateway.externalData (StateFlow baru)
+ */
 @Singleton
 class BluetoothGateway @Inject constructor(
-    private val context: Context
+    private val context: Context,
+    private val sensorGateway: SensorGateway  // inject untuk auto-switch
 ) {
-    private val sppUuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+    private val sppUuid = UUID.fromString(Constants_BT.SPP_UUID)
 
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
         val manager = context.getSystemService(BluetoothManager::class.java)
@@ -37,42 +49,58 @@ class BluetoothGateway @Inject constructor(
 
     private var bluetoothSocket: BluetoothSocket? = null
     private var readingJob: Job? = null
+    private var reconnectJob: Job? = null
     private val gatewayScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
-    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
-
-    private val _receivedData = MutableStateFlow("")
-    val receivedData: StateFlow<String> = _receivedData.asStateFlow()
+    private var reconnectAttempts = 0
+    private val maxReconnectAttempts = 5
 
     sealed class ConnectionState {
         object Disconnected : ConnectionState()
         object Connecting : ConnectionState()
         data class Connected(val device: BluetoothDevice) : ConnectionState()
+        data class Reconnecting(val attempt: Int) : ConnectionState()
         data class Error(val message: String) : ConnectionState()
     }
 
-    // ─── Permission helper ────────────────────────────────────────────────────
+    data class Esp32Data(
+        val timestamp: Long,
+        val pulseCount: Long,
+        val accelZ: Float,      // g
+        val batteryVoltage: Float,
+        val temperature: Float,
+        val speedKmh: Float = 0f  // dihitung dari pulse + kalibrasi
+    )
+
+    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
+    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+
+    private val _esp32Data = MutableStateFlow<Esp32Data?>(null)
+    val esp32Data: StateFlow<Esp32Data?> = _esp32Data.asStateFlow()
+
+    private val _rawLine = MutableStateFlow("")
+    val rawLine: StateFlow<String> = _rawLine.asStateFlow()
+
+    /** true jika data dari ESP32 digunakan sebagai sumber sensor utama */
+    val isExternalSensorActive: Boolean
+        get() = _connectionState.value is ConnectionState.Connected
+
+    // Kalibrasi (dari PreferencesManager atau UI kalibrasi)
+    var wheelCircumferenceMeter: Double = 1.885  // default: roda 60cm diameter
+    var pulsesPerRevolution: Int = 20
 
     private fun hasBluetoothPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(
-                context, Manifest.permission.BLUETOOTH_CONNECT
-            ) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+                    PackageManager.PERMISSION_GRANTED
         } else {
-            ContextCompat.checkSelfPermission(
-                context, Manifest.permission.BLUETOOTH
-            ) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH) ==
+                    PackageManager.PERMISSION_GRANTED
         }
     }
 
-    // ─── Public API ───────────────────────────────────────────────────────────
-
     fun getBondedDevices(): List<BluetoothDevice> {
-        if (!hasBluetoothPermission()) {
-            Timber.w("BLUETOOTH_CONNECT permission not granted")
-            return emptyList()
-        }
+        if (!hasBluetoothPermission()) return emptyList()
         return try {
             bluetoothAdapter?.bondedDevices?.toList() ?: emptyList()
         } catch (e: SecurityException) {
@@ -81,130 +109,184 @@ class BluetoothGateway @Inject constructor(
         }
     }
 
-    /**
-     * Menghubungkan ke device secara blocking di IO dispatcher.
-     * Setelah konek berhasil, memulai loop baca data dari socket.
-     */
     fun connect(address: String) {
         if (!hasBluetoothPermission()) {
             _connectionState.value = ConnectionState.Error("Bluetooth permission not granted")
             return
         }
+        reconnectAttempts = 0
+        connectInternal(address)
+    }
 
+    private fun connectInternal(address: String) {
         gatewayScope.launch {
             _connectionState.value = ConnectionState.Connecting
-
             try {
                 val device = bluetoothAdapter?.getRemoteDevice(address)
                     ?: run {
-                        _connectionState.value = ConnectionState.Error("Device not found")
+                        _connectionState.value = ConnectionState.Error("Device not found: $address")
                         return@launch
                     }
 
-                // Batalkan discovery agar konek lebih cepat
-                try {
-                    bluetoothAdapter?.cancelDiscovery()
-                } catch (e: SecurityException) {
-                    Timber.w(e, "Could not cancel discovery")
-                }
-
-                // Tutup socket lama jika ada
-                closeSocket()
-
-                val socket = try {
-                    device.createRfcommSocketToServiceRecord(sppUuid)
-                } catch (e: SecurityException) {
-                    _connectionState.value = ConnectionState.Error("Permission denied creating socket")
-                    return@launch
-                }
+                @Suppress("DEPRECATION")
+                val socket = device.createRfcommSocketToServiceRecord(sppUuid)
+                bluetoothAdapter?.cancelDiscovery()
+                socket.connect()
 
                 bluetoothSocket = socket
-                socket.connect() // blocking – aman karena di Dispatchers.IO
-
                 _connectionState.value = ConnectionState.Connected(device)
-                Timber.d("Bluetooth connected to $address")
+                reconnectAttempts = 0
+                Timber.i("BT Connected to ${device.name}")
 
-                // Mulai baca data
-                startReading(socket)
+                // ── AUTO-SWITCH: matikan sensor internal, pakai ESP32 ──────
+                sensorGateway.setExternalSensorActive(true)
+                Timber.i("Internal sensor PAUSED — using ESP32")
 
+                startReading(address)
             } catch (e: IOException) {
-                Timber.e(e, "Bluetooth connection failed")
-                _connectionState.value = ConnectionState.Error(e.message ?: "Connection failed")
-                closeSocket()
+                Timber.e(e, "BT connect failed")
+                handleDisconnect(address)
             } catch (e: SecurityException) {
-                Timber.e(e, "SecurityException during connect")
-                _connectionState.value = ConnectionState.Error("Permission denied")
-                closeSocket()
+                Timber.e(e, "BT SecurityException")
+                _connectionState.value = ConnectionState.Error("Bluetooth permission revoked")
             }
+        }
+    }
+
+    private fun startReading(address: String) {
+        readingJob?.cancel()
+        readingJob = gatewayScope.launch {
+            val buffer = StringBuilder()
+            val inputStream = try {
+                bluetoothSocket?.inputStream ?: run {
+                    handleDisconnect(address)
+                    return@launch
+                }
+            } catch (e: IOException) {
+                handleDisconnect(address)
+                return@launch
+            }
+
+            val byteArray = ByteArray(1024)
+            while (true) {
+                try {
+                    val bytes = inputStream.read(byteArray)
+                    if (bytes <= 0) break
+                    val chunk = String(byteArray, 0, bytes)
+                    buffer.append(chunk)
+
+                    // Parse complete lines ending with \n
+                    var newlineIdx: Int
+                    while (buffer.indexOf('\n').also { newlineIdx = it } >= 0) {
+                        val line = buffer.substring(0, newlineIdx).trim()
+                        buffer.delete(0, newlineIdx + 1)
+                        if (line.isNotEmpty()) {
+                            _rawLine.value = line
+                            parseEsp32Line(line)
+                        }
+                    }
+                } catch (e: IOException) {
+                    Timber.w("BT read error: ${e.message}")
+                    break
+                }
+            }
+            handleDisconnect(address)
+        }
+    }
+
+    private fun parseEsp32Line(line: String) {
+        // Format: RS2,<timestamp>,<pulseCount>,<accelZ>,<battVoltage>,<temp>
+        if (!line.startsWith("RS2,")) return
+        try {
+            val parts = line.split(",")
+            if (parts.size < 6) return
+
+            val ts = parts[1].toLongOrNull() ?: return
+            val pulse = parts[2].toLongOrNull() ?: return
+            val accelZ = parts[3].toFloatOrNull() ?: return
+            val vBat = parts[4].toFloatOrNull() ?: return
+            val temp = parts[5].toFloatOrNull() ?: return
+
+            val data = Esp32Data(
+                timestamp = ts,
+                pulseCount = pulse,
+                accelZ = accelZ,
+                batteryVoltage = vBat,
+                temperature = temp
+            )
+            _esp32Data.value = data
+
+            // Feed ke SensorGateway sebagai external data
+            sensorGateway.feedExternalVibration(accelZ)
+        } catch (e: Exception) {
+            Timber.w("ESP32 parse error: $line")
+        }
+    }
+
+    private suspend fun handleDisconnect(address: String) {
+        closeSafely()
+
+        // ── AUTO-FALLBACK: nyalakan kembali sensor internal ───────────────
+        sensorGateway.setExternalSensorActive(false)
+        Timber.i("ESP32 disconnected — internal sensor RESUMED")
+
+        if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++
+            val delayMs = minOf(2000L * reconnectAttempts, 30000L) // max 30 detik
+            _connectionState.value = ConnectionState.Reconnecting(reconnectAttempts)
+            Timber.i("Reconnecting in ${delayMs}ms (attempt $reconnectAttempts)")
+            delay(delayMs)
+            connectInternal(address)
+        } else {
+            _connectionState.value = ConnectionState.Error("Koneksi terputus setelah $maxReconnectAttempts percobaan")
+            reconnectAttempts = 0
         }
     }
 
     fun disconnect() {
+        reconnectAttempts = maxReconnectAttempts // stop auto-reconnect
         readingJob?.cancel()
-        readingJob = null
-        closeSocket()
+        reconnectJob?.cancel()
+        gatewayScope.launch { closeSafely() }
+        sensorGateway.setExternalSensorActive(false)
         _connectionState.value = ConnectionState.Disconnected
-        Timber.d("Bluetooth disconnected")
+        _esp32Data.value = null
     }
 
-    fun sendCommand(command: String) {
-        if (bluetoothSocket?.isConnected != true) {
-            Timber.w("Not connected, cannot send command")
-            return
-        }
-        gatewayScope.launch {
-            try {
-                bluetoothSocket?.outputStream?.let { stream ->
-                    stream.write((command + "\n").toByteArray(Charsets.UTF_8))
-                    stream.flush()
-                    Timber.d("Command sent: $command")
-                }
-            } catch (e: IOException) {
-                Timber.e(e, "Failed to send command")
-                _connectionState.value = ConnectionState.Error(e.message ?: "Send failed")
-            }
-        }
-    }
-
-    // ─── Private helpers ──────────────────────────────────────────────────────
-
-    /**
-     * Loop membaca data dari InputStream socket secara terus-menerus.
-     * Berjalan di coroutine terpisah hingga socket ditutup.
-     */
-    private fun startReading(socket: BluetoothSocket) {
-        readingJob?.cancel()
-        readingJob = gatewayScope.launch {
-            val buffer = ByteArray(1024)
-            Timber.d("Reading loop started")
-            try {
-                val inputStream = socket.inputStream
-                while (true) {
-                    val bytesRead = withContext(Dispatchers.IO) {
-                        inputStream.read(buffer) // blocking
-                    }
-                    if (bytesRead > 0) {
-                        val received = String(buffer, 0, bytesRead, Charsets.UTF_8).trim()
-                        Timber.d("Received: $received")
-                        _receivedData.value = received
-                    }
-                }
-            } catch (e: IOException) {
-                Timber.w(e, "Reading loop ended")
-                // Jika masih dalam state Connected, berarti koneksi putus tiba-tiba
-                if (_connectionState.value is ConnectionState.Connected) {
-                    _connectionState.value = ConnectionState.Error("Connection lost")
-                }
-            }
-        }
-    }
-
-    private fun closeSocket() {
+    private suspend fun closeSafely() = withContext(Dispatchers.IO) {
         try {
             bluetoothSocket?.close()
         } catch (e: IOException) {
-            Timber.e(e, "Error closing socket")
+            Timber.w("Error closing socket: ${e.message}")
         }
         bluetoothSocket = null
     }
+
+    /**
+     * Kirim perintah ke ESP32.
+     * @param command "CMD:START", "CMD:STOP", "CMD:PAUSE"
+     */
+    fun sendCommand(command: String) {
+        gatewayScope.launch {
+            try {
+                val out = bluetoothSocket?.outputStream ?: return@launch
+                out.write("$command\n".toByteArray())
+                out.flush()
+                Timber.d("BT Command sent: $command")
+            } catch (e: IOException) {
+                Timber.e(e, "Failed to send command: $command")
+            }
+        }
+    }
+
+    /** Kalkulasi jarak dari pulse count menggunakan kalibrasi */
+    fun pulseToDistance(pulseCount: Long): Double {
+        val revolutions = pulseCount.toDouble() / pulsesPerRevolution
+        return revolutions * wheelCircumferenceMeter
+    }
+}
+
+// Konstanta BT terpisah untuk menghindari circular dependency
+private object Constants_BT {
+    const val SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB"
 }

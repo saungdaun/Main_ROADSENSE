@@ -16,9 +16,10 @@ import zaujaani.roadsensebasic.data.local.entity.*
         SurveySession::class,
         RoadEvent::class,
         SegmentSdi::class,
-        DistressItem::class
+        DistressItem::class,
+        PhotoAnalysisResult::class      // ← BARU: tabel hasil analisis AI
     ],
-    version = 7, // Naikkan dari 6 ke 7
+    version = 8,                        // ← naik dari 7 ke 8
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -29,15 +30,15 @@ abstract class RoadSenseDatabase : RoomDatabase() {
     abstract fun eventDao(): EventDao
     abstract fun segmentSdiDao(): SegmentSdiDao
     abstract fun distressItemDao(): DistressItemDao
+    abstract fun photoAnalysisDao(): PhotoAnalysisDao  // ← BARU
 
     companion object {
 
         @Volatile
         private var INSTANCE: RoadSenseDatabase? = null
 
-        // =========================
-        // MIGRATION 1 → 2
-        // =========================
+        // ── Migrasi lama (tidak diubah) ───────────────────────────────────
+
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE road_segments ADD COLUMN startLat REAL NOT NULL DEFAULT 0.0")
@@ -47,9 +48,6 @@ abstract class RoadSenseDatabase : RoomDatabase() {
             }
         }
 
-        // =========================
-        // MIGRATION 2 → 3
-        // =========================
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE survey_sessions ADD COLUMN surveyorName TEXT NOT NULL DEFAULT ''")
@@ -61,9 +59,6 @@ abstract class RoadSenseDatabase : RoomDatabase() {
             }
         }
 
-        // =========================
-        // MIGRATION 3 → 4
-        // =========================
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE telemetry_raw ADD COLUMN vibrationX REAL NOT NULL DEFAULT 0.0")
@@ -71,12 +66,8 @@ abstract class RoadSenseDatabase : RoomDatabase() {
             }
         }
 
-        // =========================
-        // MIGRATION 4 → 5
-        // =========================
         private val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 1. Buat tabel road_events
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `road_events` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -90,20 +81,13 @@ abstract class RoadSenseDatabase : RoomDatabase() {
                         `notes` TEXT
                     )
                 """)
-                // 2. Hapus tabel lama
                 db.execSQL("DROP TABLE IF EXISTS `road_segments`")
             }
         }
 
-        // =========================
-        // MIGRATION 5 → 6
-        // =========================
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 1. Tambah kolom mode ke survey_sessions
                 db.execSQL("ALTER TABLE survey_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'GENERAL'")
-
-                // 2. Buat tabel segment_sdi
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `segment_sdi` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -116,8 +100,6 @@ abstract class RoadSenseDatabase : RoomDatabase() {
                         `createdAt` INTEGER NOT NULL
                     )
                 """)
-
-                // 3. Buat tabel distress_items
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `distress_items` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -134,25 +116,62 @@ abstract class RoadSenseDatabase : RoomDatabase() {
                         `createdAt` INTEGER NOT NULL
                     )
                 """)
-
-                // 4. Buat indeks untuk performa
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_segment_sdi_session ON segment_sdi(sessionId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_distress_segment ON distress_items(segmentId)")
             }
         }
 
-        // =========================
-        // MIGRATION 6 → 7 (tambah kolom avgSdi)
-        // =========================
         private val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE survey_sessions ADD COLUMN avgSdi INTEGER NOT NULL DEFAULT 0")
             }
         }
 
-        // =========================
-        // GET INSTANCE
-        // =========================
+        // ── MIGRATION 7 → 8: tabel photo_analysis ─────────────────────────
+        //
+        // Membuat tabel baru untuk menyimpan hasil analisis AI per foto.
+        // Tidak ada perubahan di tabel lain — data lama aman 100%.
+        //
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `photo_analysis` (
+                        `photoPath`              TEXT NOT NULL PRIMARY KEY,
+                        `sessionId`              INTEGER NOT NULL,
+                        `status`                 TEXT NOT NULL DEFAULT 'PENDING',
+                        `analysisJson`           TEXT NOT NULL DEFAULT '',
+                        `overallCondition`       TEXT NOT NULL DEFAULT '',
+                        `overallConditionScore`  INTEGER NOT NULL DEFAULT 0,
+                        `detectedTypes`          TEXT NOT NULL DEFAULT '',
+                        `dominantSeverity`       TEXT NOT NULL DEFAULT '',
+                        `confidenceScore`        REAL NOT NULL DEFAULT 0.0,
+                        `aiDescription`          TEXT NOT NULL DEFAULT '',
+                        `aiRecommendation`       TEXT NOT NULL DEFAULT '',
+                        `isManualOverride`       INTEGER NOT NULL DEFAULT 0,
+                        `manualCondition`        TEXT NOT NULL DEFAULT '',
+                        `manualNotes`            TEXT NOT NULL DEFAULT '',
+                        `errorMessage`           TEXT NOT NULL DEFAULT '',
+                        `createdAt`              INTEGER NOT NULL,
+                        `analyzedAt`             INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+
+                // Index untuk query cepat berdasarkan session
+                db.execSQL("""
+                    CREATE INDEX IF NOT EXISTS idx_photo_analysis_session 
+                    ON photo_analysis(sessionId)
+                """)
+
+                // Index untuk filter berdasarkan status (untuk antrian PENDING)
+                db.execSQL("""
+                    CREATE INDEX IF NOT EXISTS idx_photo_analysis_status 
+                    ON photo_analysis(status)
+                """)
+            }
+        }
+
+        // ── getInstance ───────────────────────────────────────────────────
+
         fun getInstance(context: Context): RoadSenseDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -166,7 +185,8 @@ abstract class RoadSenseDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_4_5,
                         MIGRATION_5_6,
-                        MIGRATION_6_7   // tambahkan migrasi baru
+                        MIGRATION_6_7,
+                        MIGRATION_7_8   // ← migrasi baru
                     )
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()

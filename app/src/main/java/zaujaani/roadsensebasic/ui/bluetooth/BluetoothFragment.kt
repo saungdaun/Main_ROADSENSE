@@ -142,6 +142,15 @@ class BluetoothFragment : Fragment() {
                                 binding.btnDisconnect.isEnabled = false
                                 binding.btnSendCommand.isEnabled = false
                             }
+                            is BluetoothGateway.ConnectionState.Reconnecting -> {
+                                binding.tvStatus.text = "Mencoba sambung ulang... (${state.attempt}x)"
+                                binding.tvStatus.setTextColor(
+                                    ContextCompat.getColor(requireContext(), R.color.yellow)
+                                )
+                                binding.btnConnect.isEnabled = false
+                                binding.btnDisconnect.isEnabled = true
+                                binding.btnSendCommand.isEnabled = false
+                            }
                             is BluetoothGateway.ConnectionState.Disconnected -> {
                                 binding.tvStatus.text = getString(R.string.disconnected)
                                 binding.tvStatus.setTextColor(
@@ -159,17 +168,6 @@ class BluetoothFragment : Fragment() {
                                 binding.btnConnect.isEnabled = true
                                 binding.btnDisconnect.isEnabled = false
                                 binding.btnSendCommand.isEnabled = false
-                            }
-                        }
-                    }
-                }
-
-                launch {
-                    viewModel.receivedData.collect { data ->
-                        if (data.isNotBlank()) {
-                            binding.tvReceivedData.append("$data\n")
-                            binding.scrollViewData.post {
-                                binding.scrollViewData.fullScroll(View.FOCUS_DOWN)
                             }
                         }
                     }

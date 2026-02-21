@@ -1,32 +1,22 @@
 <resources>
     <!-- App -->
     <string name="app_name">RoadSense Basic</string>
-
     <!-- Drawer Header -->
     <string name="drawer_title">RoadSense Basic</string>
     <string name="drawer_subtitle">Survey Kondisi Jalan</string>
-
     <!-- Menu -->
     <string name="menu_map">Map</string>
     <string name="menu_summary">Summary</string>
     <string name="menu_settings">Settings</string>
-
     <!-- Screen Titles -->
     <string name="title_map">Map</string>
     <string name="title_summary">Summary</string>
     <string name="title_settings">Settings</string>
-    <!-- Map screen -->
-    <string name="start_survey">Mulai Survey</string>
-    <string name="stop_survey">Hentikan Survey</string>
-    <!-- Units -->
     <string name="unit_kmh">km/h</string>
     <string name="unit_m">m</string>
     <string name="unit_km">km</string>
     <string name="unit_g">g</string>
     <string name="gps_accuracy">Acc: %.1f m</string>
-    <string name="speed_format">%d km/h</string>
-    <string name="distance_m_format">%d m</string>
-    <string name="distance_km_format">%.2f km</string>
     <string name="vibration_format">%.2f g</string>
     <string name="accuracy_format">Acc: %.1f m</string>
     <string name="confidence_value">Confidence: %d%%</string>
@@ -35,12 +25,8 @@
     <string name="gps_accuracy_low">Akurasi GPS rendah</string>
     <string name="gps_accuracy_fair">Akurasi GPS cukup</string>
     <string name="gps_accuracy_good">Akurasi GPS baik</string>
-
-    <string name="take_photo">Ambil Foto</string>
     <string name="take">Ambil</string>
-    <string name="recording_failed">Gagal memulai rekaman</string>
     <string name="play_recording">Putar Rekaman</string>
-    <string name="stop">Stop</string>
     <string name="play_failed">Gagal memutar</string>
     <string name="road_name_required">Nama ruas harus diisi</string>
     <string name="default_surface">Aspal</string>
@@ -60,17 +46,9 @@
     <string name="surface_hint">Jenis Permukaan</string>
     <string name="voice_record">Rekam Catatan Suara</string>
     <string name="notes_hint">Catatan (opsional)</string>
-    <string name="save">Simpan</string>
     <string name="total_distance">Total_Jarak\n</string>
     <string name="segment_count">Ruas_Ke\n</string>
     <string name="detail_coming_soon">Detail untuk sesi %d (coming soon)</string>
-
-    <string name="survey_running">Survey sedang berjalan</string>
-    <string name="survey_paused">Survey dijeda</string>
-    <string name="notification_survey_progress">Jarak: %s</string>
-    <string name="notification_channel_desc">Menampilkan status survey</string>
-    <string name="notification_title">RoadSense Survey</string>
-
     <string name="label_speed">Kecepatan</string>
     <string name="label_distance">Jarak</string>
     <string name="label_vibration">Getaran</string>
@@ -84,7 +62,6 @@
     <string name="content_desc_voice_fab">Rekam Suara</string>
     <string name="content_desc_condition_fab">Pilih Kondisi</string>
     <string name="content_desc_surface_fab">Pilih Permukaan</string>
-
     <!-- Strings untuk SummaryFragment - Detail Dialog -->
     <string name="detail_title">Detail Survey</string>
     <string name="detail_date">Tanggal: %s</string>
@@ -101,29 +78,11 @@
     <string name="detail_surface_header">Distribusi Permukaan:</string>
     <string name="detail_segments_header">Daftar Segmen:</string>
     <string name="no_name">Tanpa Nama</string>
-
-    <!-- Strings untuk Ekspor -->
-    <string name="export_csv">Ekspor CSV</string>
-    <string name="export_gpx">Ekspor GPX</string>
-    <string name="export_success">Ekspor Berhasil</string>
-    <string name="export_failed">Ekspor Gagal</string>
-    <string name="export_success_message">File tersimpan di:\n%s</string>
-
-    <!-- Strings untuk Opsi Sesi -->
-    <string name="view_details">Lihat Detail</string>
-    <string name="delete">Hapus</string>
-    <string name="session_options">Pilih Tindakan</string>
-    <string name="delete_session">Hapus Survey</string>
-    <string name="delete_session_confirm">Apakah Anda yakin ingin menghapus survey ini? Semua data segmen akan ikut terhapus.</string>
-    <string name="cancel">Batal</string>
-    <string name="ok">OK</string>
-    <!-- Tambahan -->
     <string name="threshold_baik_label">Baik: %s g</string>
     <string name="threshold_sedang_label">Sedang: %s g</string>
     <string name="threshold_rusak_label">Rusak Ringan: %s g</string>
     <string name="gps_interval_label">Interval GPS: %d ms</string>
     <string name="menu_bluetooth">Bluetooth</string>
-    <!-- strings.xml tambahan -->
     <string name="segment_start_title">Mulai: %s</string>
     <string name="segment_marker_snippet" formatted="false">%s, %s, %d m</string>
     <string name="segment_end_title">Akhir: %s</string>
@@ -133,22 +92,10 @@
     <string name="condition_rusak_ringan">Rusak Ringan</string>
     <string name="chart_no_data">Tunggu data…</string>
     <string name="chart_z_label">Z-Axis (g)</string>
-    <string name="survey_not_active">Survey tidak aktif</string>
     <string name="segment_started_toast">Segmen dimulai</string>
     <string name="camera_quick_tip">Ambil foto cepat</string>
     <string name="voice_quick_tip">Rekam catatan suara</string>
-    <string name="pick_condition_title">Pilih Kondisi</string>
-    <string name="condition_selected">Kondisi: %s</string>
-    <string name="pick_surface_title">Pilih Permukaan</string>
-    <string name="surface_selected">Permukaan: %s</string>
-    <string name="stop_survey_confirm">Apakah Anda yakin ingin menghentikan survey?</string>
-    <string name="discard">Buang</string>
-    <string name="resume">Lanjutkan</string>
-    <string name="surveyor_name_hint">Nama Surveyor (opsional)</string>
-    <string name="start">Mulai</string>
-    <string name="toggle_orientation">Toggle orientasi</string>
-    <string name="orientation_enabled">Orientasi mengikuti GPS aktif</string>
-    <string name="orientation_disabled">Orientasi mengikuti GPS mati</string>
+
     <string name="event_count">Jumlah event</string>
     <string name="scan_devices">Scan Perangkat</string>
     <string name="mac_address_hint">Alamat MAC</string>
@@ -168,36 +115,14 @@
     <string name="view_photos">Lihat Foto</string>
     <string name="no_photos">Tidak ada foto</string>
     <string name="photo_file_not_found">File foto tidak ditemukan</string>
-    <string name="photo_preview_title">Preview Foto</string>
     <string name="previous">Sebelumnya</string>
     <string name="next">Berikutnya</string>
-    <string name="close">Tutup</string>
 
-    <string name="watermark_app_name">RoadSense SaungDaun</string>
-    <string name="watermark_distance">Jarak: %d m</string>
-    <string name="photo_saved">Foto tersimpan</string>
-    <string name="file_not_found">File foto tidak ditemukan</string>
-    <string name="photo_failed">Gagal mengambil foto</string>
-    <string name="camera_permission_required">Izin kamera diperlukan</string>
-    <string name="microphone_permission_required">Izin mikrofon diperlukan</string>
-    <string name="distress_saved">Kerusakan tersimpan</string>
-    <string name="quick_5">5</string>
-    <string name="quick_10">10</string>
-    <string name="quick_20">20</string>
-    <string name="quick_50">50</string>
-    <string name="unit_default">Panjang/Luas</string>
-    <string name="select_distress_type">Pilih jenis kerusakan</string>
-    <string name="select_severity">Pilih tingkat keparahan</string>
-    <string name="enter_length_area">Masukkan panjang/luas</string>
-    <string name="invalid_data">Data tidak valid</string>
     <!-- Baru - tambahkan di strings.xml -->
     <string name="condition_rusak_berat">Rusak Berat</string>
-    <string name="audio_saved">Rekaman tersimpan</string>
+
     <string name="timer_default">00:00</string>
-    <string name="warning_title">Peringatan</string>
-    <string name="condition_mismatch_message">Data getaran menunjukkan kondisi berbeda. Yakin memilih %s?</string>
-    <string name="surveyor_name_required">Nama surveyor wajib diisi</string>
-    <string name="distance_reached_prompt">Jarak %d m tercapai. Ambil foto?</string>
+
     <string name="mode_general">Umum</string>
     <string name="mode_sdi">SDI</string>
     <string name="select_mode">Pilih Mode</string>
@@ -206,16 +131,111 @@
     <string name="severity_low">Ringan</string>
     <string name="severity_medium">Sedang</string>
     <string name="severity_high">Berat</string>
-    <string name="unit_length">Panjang (m)</string>
-    <string name="unit_area">Luas (m²)</string>
     <string name="custom_value_hint">Isi sendiri</string>
     <string name="add_photo">Tambah Foto</string>
-    <string name="record_voice">Rekam Suara</string>
-    <string name="sdi_average">
-    SDI Rata-rata: %d (%s)
-    </string>
-    <string name="watermark_coord" formatted="false">Lat: %s, Lon: %s</string>
-    <string name="export_pdf">Ekspor PDF</string>
+    <string name="sdi_average" formatted="false">Rata-rata SDI: %d (%s)</string>
+    <string name="watermark_coord" formatted="false">GPS: %s, %s</string>
+
+
+
     <string name="photo_thumbnail">Thumbnail foto</string>
+
+    <!-- ================================================================
+     strings.xml — TAMBAHAN untuk RoadSense
+     Tambahkan entry-entry berikut ke dalam res/values/strings.xml
+     yang sudah ada (jangan replace seluruh file, cukup tambahkan)
+     ================================================================ -->
+
+    <!-- String baru yang dipakai MapFragment versi terbaru -->
+    <string name="sdi_mode_required">Tidak dalam mode SDI atau survey tidak aktif</string>
+
+    <!-- String ini mungkin sudah ada, pastikan ada semua -->
+    <string name="survey_not_active">Survey belum aktif</string>
+    <string name="start_survey">Mulai Survey</string>
+    <string name="start">Mulai</string>
+    <string name="stop">Stop</string>
+    <string name="save">Simpan</string>
+    <string name="discard">Buang</string>
+    <string name="resume">Lanjutkan</string>
+    <string name="cancel">Batal</string>
+    <string name="ok">OK</string>
+    <string name="close">Tutup</string>
+    <string name="delete">Hapus</string>
+
+    <string name="stop_survey">Akhiri Survey</string>
+    <string name="stop_survey_confirm">Apakah kamu ingin menyimpan data survey ini?</string>
+    <string name="surveyor_name_required">Nama surveyor wajib diisi</string>
+
+    <string name="pick_condition_title">Pilih Kondisi Jalan</string>
+    <string name="pick_surface_title">Pilih Jenis Permukaan</string>
+    <string name="condition_selected">Kondisi: %s</string>
+    <string name="surface_selected">Permukaan: %s</string>
+    <string name="warning_title">Peringatan</string>
+    <string name="condition_mismatch_message">Getaran sensor tidak sesuai dengan kondisi \"%s\" yang dipilih. Yakin ingin tetap memilih kondisi ini?</string>
+
+    <string name="orientation_enabled">Rotasi peta: Aktif</string>
+    <string name="orientation_disabled">Rotasi peta: Nonaktif</string>
+
+    <string name="take_photo">Foto</string>
+    <string name="distance_reached_prompt">%d m tercapai — ambil foto dokumentasi?</string>
+
+    <string name="speed_format">%d km/h</string>
+    <string name="distance_m_format">%d m</string>
+    <string name="distance_km_format">%.2f km</string>
+
+    <!-- Notifikasi service -->
+    <string name="notification_title">RoadSense Survey Aktif</string>
+    <string name="survey_running">Survey berjalan…</string>
+    <string name="survey_paused">Survey dijeda</string>
+    <string name="notification_survey_progress">Jarak: %s</string>
+    <string name="notification_channel_desc">Notifikasi progres survey jalan</string>
+    <string name="distance_m_format_notif">%d m</string>
+    <string name="distance_km_format_notif">%.2f km</string>
+
+    <!-- Watermark foto -->
+    <string name="watermark_app_name">RoadSense</string>
+    <string name="watermark_distance">Jarak: %d m</string>
+
+
+    <!-- Distress Bottom Sheet -->
+    <string name="distress_saved">Data kerusakan tersimpan</string>
+    <string name="select_distress_type">Pilih jenis kerusakan terlebih dahulu</string>
+    <string name="select_severity">Pilih tingkat keparahan terlebih dahulu</string>
+    <string name="enter_length_area">Masukkan panjang atau luas kerusakan</string>
+    <string name="invalid_data">Data tidak valid, periksa kembali</string>
+    <string name="record_voice">Rekam Suara</string>
+    <string name="recording_failed">Gagal memulai rekaman</string>
+    <string name="audio_saved">Rekaman tersimpan</string>
+    <string name="photo_saved">Foto tersimpan</string>
+    <string name="photo_failed">Gagal mengambil foto</string>
+    <string name="file_not_found">File foto tidak ditemukan</string>
+    <string name="camera_permission_required">Izin kamera diperlukan</string>
+    <string name="microphone_permission_required">Izin mikrofon diperlukan</string>
+
+    <!-- Unit label -->
+    <string name="unit_length">m (panjang)</string>
+    <string name="unit_area">m² (luas)</string>
+    <string name="unit_default">m / m²</string>
+
+    <!-- Quick input SDI -->
+    <string name="quick_5">5</string>
+    <string name="quick_10">10</string>
+    <string name="quick_20">20</string>
+    <string name="quick_50">50</string>
+
+    <!-- Summary / Export -->
+    <string name="view_details">Lihat Detail</string>
+    <string name="export_gpx">Ekspor GPX</string>
+    <string name="export_csv">Ekspor CSV</string>
+    <string name="export_pdf">Ekspor PDF</string>
+    <string name="export_success">Ekspor Berhasil</string>
+    <string name="export_success_message">File disimpan di: %s</string>
+    <string name="export_failed">Ekspor gagal</string>
+    <string name="delete_session">Hapus Sesi</string>
+    <string name="delete_session_confirm">Data survey ini akan dihapus permanen. Lanjutkan?</string>
+    <string name="session_options">Pilihan Sesi</string>
+    <string name="photo_preview_title">Preview Foto</string>
+    <string name="surveyor_name_hint">Masukkan Nama Surveyor</string>
+    <string name="action_pause">Pause ⏸</string>
 
 </resources>

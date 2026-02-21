@@ -7,6 +7,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import zaujaani.roadsensebasic.data.local.RoadSenseDatabase
+import zaujaani.roadsensebasic.data.local.dao.PhotoAnalysisDao
+import zaujaani.roadsensebasic.data.repository.PhotoAnalysisRepository
 import zaujaani.roadsensebasic.data.repository.SurveyRepository
 import zaujaani.roadsensebasic.data.repository.TelemetryRepository
 import zaujaani.roadsensebasic.domain.engine.*
@@ -51,8 +53,11 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideBluetoothGateway(@ApplicationContext context: Context): BluetoothGateway {
-        return BluetoothGateway(context)
+    fun provideBluetoothGateway(
+        @ApplicationContext context: Context,
+        sensorGateway: SensorGateway
+    ): BluetoothGateway {
+        return BluetoothGateway(context, sensorGateway)
     }
 
     @Provides
@@ -91,5 +96,20 @@ object AppModule {
             confidenceCalculator = confidenceCalculator,
             sdiCalculator = sdiCalculator
         )
+    }
+    @Provides
+    @Singleton
+    fun providePhotoAnalysisDao(db: RoadSenseDatabase): PhotoAnalysisDao {
+        return db.photoAnalysisDao()
+    }
+
+    // Repository analisis AI — akan dipakai oleh PhotoAnalysisViewModel
+    @Provides
+    @Singleton
+    fun providePhotoAnalysisRepository(
+        dao: PhotoAnalysisDao,
+        @ApplicationContext context: Context
+    ): PhotoAnalysisRepository {
+        return PhotoAnalysisRepository(dao, context)
     }
 }

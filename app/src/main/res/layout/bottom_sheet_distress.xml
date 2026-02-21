@@ -1,227 +1,316 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+    bottom_sheet_distress.xml
+    Layout untuk DistressBottomSheet (SDI mode)
+
+    Elemen:
+    - Dropdown: Jenis Kerusakan, Tingkat Keparahan
+    - tvSurveyorGuide: panduan pengukuran per jenis kerusakan (BARU)
+    - etLengthArea: input panjang / luas
+    - tvUnitLabel: satuan (m atau m²) — update otomatis
+    - 4 tombol preset cepat (label update otomatis per jenis)
+    - Foto & Voice recorder
+    - Thumbnail foto preview
+    - etNotes: catatan tambahan
+    - btnSave: simpan
+-->
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="20dp"
     android:background="@color/surface"
-    android:elevation="8dp">
-
-    <!-- Jenis Kerusakan -->
-    <com.google.android.material.textfield.TextInputLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="@string/distress_type_hint"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-        android:layout_marginBottom="16dp"
-        app:boxStrokeColor="@color/primary"
-        app:boxStrokeWidth="1.5dp"
-        app:boxStrokeWidthFocused="2dp">
-
-        <com.google.android.material.textfield.MaterialAutoCompleteTextView
-            android:id="@+id/actvDistressType"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="none"
-            android:dropDownHeight="200dp"
-            android:padding="12dp"
-            android:textSize="16sp"
-            android:fontFamily="sans-serif-medium"
-            android:importantForAutofill="no" />
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <!-- Tingkat Keparahan (Dropdown) -->
-    <com.google.android.material.textfield.TextInputLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="@string/severity_label"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-        android:layout_marginBottom="16dp"
-        app:boxStrokeColor="@color/primary"
-        app:boxStrokeWidth="1.5dp"
-        app:boxStrokeWidthFocused="2dp">
-
-        <com.google.android.material.textfield.MaterialAutoCompleteTextView
-            android:id="@+id/actvSeverity"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="none"
-            android:dropDownHeight="200dp"
-            android:padding="12dp"
-            android:textSize="16sp"
-            android:fontFamily="sans-serif-medium"
-            android:importantForAutofill="no" />
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <!-- Unit Label Dinamis + Quick Buttons -->
-    <TextView
-        android:id="@+id/tvUnitLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/unit_length"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:textColor="@color/text_primary"
-        android:layout_marginBottom="8dp" />
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_marginBottom="12dp">
+        android:orientation="vertical"
+        android:padding="16dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnQuick5"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/quick_5"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_marginEnd="4dp"
-            app:cornerRadius="8dp" />
+        <!-- ── Handle bar ── -->
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_bottom_sheet_handle"
+            android:backgroundTint="@color/divider" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnQuick10"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/quick_10"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"
-            app:cornerRadius="8dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnQuick20"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/quick_20"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"
-            app:cornerRadius="8dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnQuick50"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/quick_50"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_marginStart="4dp"
-            app:cornerRadius="8dp" />
-    </LinearLayout>
-
-    <!-- Input Custom -->
-    <com.google.android.material.textfield.TextInputLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="@string/custom_value_hint"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-        android:layout_marginBottom="16dp"
-        app:boxStrokeColor="@color/primary"
-        app:boxStrokeWidth="1.5dp"
-        app:boxStrokeWidthFocused="2dp">
-
-        <EditText
-            android:id="@+id/etLengthArea"
+        <!-- ── Judul ── -->
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="numberDecimal"
-            android:padding="12dp"
+            android:text="Input Kerusakan Jalan"
             android:textSize="16sp"
-            android:autofillHints="lengthOrArea" />
-    </com.google.android.material.textfield.TextInputLayout>
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="16dp" />
 
-    <!-- Foto dan Voice (Icon Buttons) -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="16dp">
+        <!-- ══════════════════════════════════════════════
+             SECTION 1: Jenis & Keparahan
+             ══════════════════════════════════════════════ -->
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnAddPhoto"
-            android:layout_width="0dp"
+        <!-- Dropdown: Jenis Kerusakan -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:icon="@drawable/ic_camera"
-            app:iconGravity="textStart"
-            android:text="@string/add_photo"
-            android:textSize="14sp"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_marginEnd="8dp"
-            app:cornerRadius="8dp"
-            app:iconPadding="8dp" />
+            android:layout_marginBottom="4dp"
+            android:hint="Jenis Kerusakan"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            app:boxCornerRadiusTopStart="10dp"
+            app:boxCornerRadiusTopEnd="10dp"
+            app:boxCornerRadiusBottomStart="10dp"
+            app:boxCornerRadiusBottomEnd="10dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnVoice"
-            android:layout_width="0dp"
+            <AutoCompleteTextView
+                android:id="@+id/actvDistressType"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="none"
+                android:focusable="false"
+                tools:text="Lubang" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Panduan Surveyor (muncul setelah jenis dipilih) -->
+        <TextView
+            android:id="@+id/tvSurveyorGuide"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:icon="@drawable/ic_mic"
-            app:iconGravity="textStart"
-            android:text="@string/record_voice"
-            android:textSize="14sp"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_marginStart="8dp"
-            app:cornerRadius="8dp"
-            app:iconPadding="8dp" />
-    </LinearLayout>
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            android:lineSpacingMultiplier="1.3"
+            android:background="@drawable/bg_guide_box"
+            android:visibility="gone"
+            tools:visibility="visible"
+            tools:text="📐 Hitung luas: P × L lubang → m²&#10;   Contoh: 0.5m × 0.4m = 0.20 m²" />
 
-    <!-- Thumbnail Foto (opsional) -->
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        android:visibility="gone"
-        android:id="@+id/photoThumbContainer">
+        <!-- Dropdown: Tingkat Keparahan -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:hint="Tingkat Keparahan"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            app:boxCornerRadiusTopStart="10dp"
+            app:boxCornerRadiusTopEnd="10dp"
+            app:boxCornerRadiusBottomStart="10dp"
+            app:boxCornerRadiusBottomEnd="10dp">
 
+            <AutoCompleteTextView
+                android:id="@+id/actvSeverity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="none"
+                android:focusable="false"
+                tools:text="Sedang" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ══════════════════════════════════════════════
+             SECTION 2: Input ukuran
+             ══════════════════════════════════════════════ -->
+
+        <!-- Label unit (m atau m², update otomatis) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Panjang / Luas"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <TextView
+                android:id="@+id/tvUnitLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="3dp"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="@color/primary"
+                android:background="@drawable/bg_chip_rounded"
+                android:text="m / m²"
+                tools:text="m²" />
+        </LinearLayout>
+
+        <!-- Input angka -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:hint="Nilai (contoh: 0.25)"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:boxCornerRadiusTopStart="10dp"
+            app:boxCornerRadiusTopEnd="10dp"
+            app:boxCornerRadiusBottomStart="10dp"
+            app:boxCornerRadiusBottomEnd="10dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etLengthArea"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="numberDecimal"
+                android:imeOptions="actionDone" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Tombol preset cepat (4 tombol, label update per jenis) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="20dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnQuick5"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="5m"
+                android:textSize="11sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnQuick10"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="2dp"
+                android:text="10m"
+                android:textSize="11sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnQuick20"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="2dp"
+                android:text="20m"
+                android:textSize="11sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnQuick50"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="50m"
+                android:textSize="11sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+        </LinearLayout>
+
+        <!-- ══════════════════════════════════════════════
+             SECTION 3: Foto & Suara
+             ══════════════════════════════════════════════ -->
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Dokumentasi"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp">
+
+            <!-- Tombol Foto -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAddPhoto"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="Foto"
+                app:icon="@drawable/ic_camera"
+                app:iconGravity="start"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+            <!-- Tombol Voice Recording -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnVoice"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:text="@string/record_voice"
+                app:icon="@drawable/ic_mic"
+                app:iconGravity="start"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+        </LinearLayout>
+
+        <!-- Thumbnail foto preview (muncul setelah foto diambil) -->
         <ImageView
             android:id="@+id/ivPhotoThumb"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
+            android:layout_width="match_parent"
+            android:layout_height="140dp"
+            android:layout_marginBottom="12dp"
             android:scaleType="centerCrop"
-            android:background="@drawable/photo_thumb_bg"
-            android:layout_gravity="center_horizontal"
-            android:contentDescription="@string/photo_thumbnail" />
-    </FrameLayout>
+            android:background="@drawable/bg_photo_thumb"
+            android:visibility="gone"
+            tools:visibility="visible"
+            tools:src="@drawable/ic_camera"
+            android:contentDescription="Preview foto kerusakan" />
 
-    <!-- Catatan -->
-    <com.google.android.material.textfield.TextInputLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="@string/notes_hint"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-        android:layout_marginBottom="20dp"
-        app:boxStrokeColor="@color/primary"
-        app:boxStrokeWidth="1.5dp"
-        app:boxStrokeWidthFocused="2dp">
+        <!-- ══════════════════════════════════════════════
+             SECTION 4: Catatan
+             ══════════════════════════════════════════════ -->
 
-        <EditText
-            android:id="@+id/etNotes"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="textMultiLine"
-            android:maxLines="3"
-            android:padding="12dp"
-            android:textSize="14sp"
-            android:autofillHints="notes" />
-    </com.google.android.material.textfield.TextInputLayout>
+            android:layout_marginBottom="20dp"
+            android:hint="Catatan tambahan (opsional)"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:boxCornerRadiusTopStart="10dp"
+            app:boxCornerRadiusTopEnd="10dp"
+            app:boxCornerRadiusBottomStart="10dp"
+            app:boxCornerRadiusBottomEnd="10dp">
 
-    <!-- Tombol Simpan -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnSave"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/save"
-        android:textSize="16sp"
-        app:icon="@drawable/ic_save"
-        style="@style/Button.Premium"
-        app:cornerRadius="12dp" />
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etNotes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minLines="2"
+                android:maxLines="4"
+                android:gravity="top"
+                android:inputType="textMultiLine|textCapSentences" />
+        </com.google.android.material.textfield.TextInputLayout>
 
-</LinearLayout>
+        <!-- ══════════════════════════════════════════════
+             SECTION 5: Simpan
+             ══════════════════════════════════════════════ -->
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Simpan Kerusakan"
+            android:textSize="15sp"
+            android:layout_marginBottom="8dp"
+            app:cornerRadius="12dp"
+            app:backgroundTint="@color/primary" />
+
+    </LinearLayout>
+</ScrollView>

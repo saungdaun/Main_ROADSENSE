@@ -31,6 +31,14 @@ import zaujaani.roadsensebasic.util.Constants
 import zaujaani.roadsensebasic.util.PreferencesManager
 import javax.inject.Inject
 
+/**
+ * MapViewModel — UI state hanya.
+ *
+ * FIX KRITIS: ViewModel TIDAK memanggil surveyEngine.updateLocation().
+ * Hanya SurveyForegroundService yang boleh feed data ke engine.
+ * ViewModel hanya mengambil lokasi untuk tampilan peta & UI.
+ * Sebelumnya, keduanya memanggil updateLocation → jarak dihitung 2x lipat!
+ */
 @HiltViewModel
 class MapViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -40,14 +48,14 @@ class MapViewModel @Inject constructor(
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
 
-    // ── Location & Sensor (UI langsung pakai Location Android) ─────────────
+    // ── Location & Speed (UI display only) ────────────────────────────────
     private val _location = MutableStateFlow<Location?>(null)
     val location: StateFlow<Location?> = _location.asStateFlow()
 
     private val _speed = MutableStateFlow(0f)
     val speed: StateFlow<Float> = _speed.asStateFlow()
 
-    // Data dari engine (single source of truth)
+    // ── Data dari engine (single source of truth) ─────────────────────────
     val distance: StateFlow<Double> = surveyEngine.currentDistance
     val vibration: StateFlow<Float> = surveyEngine.currentVibration
 
@@ -58,7 +66,7 @@ class MapViewModel @Inject constructor(
     val roadName: StateFlow<String> = surveyEngine.roadName
     val mode: StateFlow<SurveyMode> = surveyEngine.mode
 
-    // ── Condition & Surface (dari engine + mirror untuk UI) ───────────────
+    // ── Condition & Surface ───────────────────────────────────────────────
     private val _currentCondition = MutableStateFlow(Condition.BAIK)
     val currentCondition: StateFlow<Condition> = _currentCondition.asStateFlow()
 
@@ -79,9 +87,12 @@ class MapViewModel @Inject constructor(
     private val _distanceTrigger = MutableSharedFlow<Double>(extraBufferCapacity = 5)
     val distanceTrigger = _distanceTrigger.asSharedFlow()
 
+    // ── Voice recording state (untuk toggle FAB) ─────────────────────────
+    private val _isRecording = MutableStateFlow(false)
+    val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+
     private var locationTrackingJob: Job? = null
 
-    // ─────────────────────────────────────────────────────────────────────
     init {
         collectPreferences()
         collectDistanceTrigger()
@@ -107,22 +118,20 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    // ── Location Tracking (teruskan ke engine dengan LocationData) ───────
+    /**
+     * Location tracking HANYA untuk UI display (peta, kecepatan).
+     * TIDAK memanggil surveyEngine.updateLocation() — itu tugas ForegroundService.
+     * Ini menghilangkan bug double-counting jarak.
+     */
     fun startLocationTracking() {
         if (locationTrackingJob?.isActive == true) return
         locationTrackingJob = gpsGateway.getLocationFlow()
-            .catch { e -> Timber.e(e, "Error in location flow") }
+            .catch { e -> Timber.e(e, "Error in location flow (UI)") }
             .onEach { loc ->
                 _location.value = loc
                 _speed.value = loc.speed
-                val locationData = LocationData(
-                    latitude = loc.latitude,
-                    longitude = loc.longitude,
-                    altitude = loc.altitude,
-                    speed = loc.speed,
-                    accuracy = loc.accuracy
-                )
-                surveyEngine.updateLocation(locationData)
+                // ✅ TIDAK panggil surveyEngine.updateLocation() di sini!
+                // ForegroundService yang menangani feed ke engine.
             }
             .launchIn(viewModelScope)
     }
@@ -180,7 +189,7 @@ class MapViewModel @Inject constructor(
         _currentSurface.value = surface
     }
 
-    fun recordPhoto(path: String, notes: String? = null) {
+    fun recordPhoto(path: String, distance: Double, lat: Double, lng: Double, notes: String? = null) {
         surveyEngine.recordPhoto(path, notes)
     }
 
@@ -188,9 +197,19 @@ class MapViewModel @Inject constructor(
         surveyEngine.recordVoice(path, notes)
     }
 
+    fun setRecordingState(recording: Boolean) {
+        _isRecording.value = recording
+    }
+
     // ── Validation ───────────────────────────────────────────────────────
     fun checkConditionConsistency(condition: Condition): Boolean =
         surveyEngine.checkConditionConsistency(condition)
+
+    // ── Helpers untuk MediaManager ────────────────────────────────────────
+    fun getCurrentDistance(): Double = surveyEngine.getCurrentDistance()
+    fun getCurrentLat(): Double = surveyEngine.getLastLocation()?.latitude ?: 0.0
+    fun getCurrentLng(): Double = surveyEngine.getLastLocation()?.longitude ?: 0.0
+    fun getCurrentRoadName(): String = surveyEngine.roadName.value
 
     // ── Foreground Service ───────────────────────────────────────────────
     private fun startForegroundService() {

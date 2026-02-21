@@ -24,6 +24,9 @@ import androidx.lifecycle.LifecycleCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -35,43 +38,72 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * MediaManager — mengelola kamera dan rekaman suara.
+ *
+ * FIX:
+ * - isRecording sekarang StateFlow → bisa diobservasi oleh Fragment untuk update UI FAB
+ * - toggleRecording() untuk start/stop tanpa race condition
+ * - Auto-stop rekaman setelah MAX_RECORDING_SECONDS
+ * - Watermark foto sekarang menerima metadata (jarak, GPS, nama ruas)
+ * - Tidak ada duplikasi resource: satu MediaRecorder aktif sekaligus
+ */
 class MediaManager(
     private val fragment: Fragment,
     private val lifecycleScope: LifecycleCoroutineScope,
-    private val onPhotoTaken: (String) -> Unit,
-    private val onVoiceRecorded: (String) -> Unit
+    private val onPhotoTaken: (path: String, metadata: PhotoMetadata) -> Unit,
+    private val onVoiceRecorded: (path: String) -> Unit,
+    private val metadataProvider: () -> PhotoMetadata
 ) {
+    companion object {
+        const val MAX_RECORDING_SECONDS = 30
+    }
+
+    data class PhotoMetadata(
+        val distanceMeters: Double = 0.0,
+        val latitude: Double = 0.0,
+        val longitude: Double = 0.0,
+        val roadName: String = "",
+        val surveyMode: String = "GENERAL"
+    )
+
     private var currentPhotoPath: String? = null
     private var currentPhotoUri: Uri? = null
 
     private var mediaRecorder: MediaRecorder? = null
     private var currentAudioFile: File? = null
-    private var isRecording = false
+
+    private val _isRecording = MutableStateFlow(false)
+    val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+
+    private val _recordingSeconds = MutableStateFlow(0)
+    val recordingSeconds: StateFlow<Int> = _recordingSeconds.asStateFlow()
+
     private var recordingTimerJob: Job? = null
-    private var recordingSeconds = 0
 
     // Camera launcher
     private val takePictureLauncher = fragment.registerForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
         if (success && currentPhotoPath != null) {
-            val originalPath = currentPhotoPath!!
+            val path = currentPhotoPath!!
+            val meta = metadataProvider()
             lifecycleScope.launch(Dispatchers.IO) {
-                val processedPath = addWatermark(originalPath)
+                val processedPath = addWatermark(path, meta)
                 withContext(Dispatchers.Main) {
                     if (processedPath != null) {
-                        saveToPublicGallery(processedPath)
-                        onPhotoTaken(processedPath)
+                        lifecycleScope.launch(Dispatchers.IO) { saveToPublicGallery(processedPath) }
+                        onPhotoTaken(processedPath, meta)
                         showToast("Foto tersimpan")
                     } else {
-                        showToast("Gagal menambahkan watermark")
+                        showToast("Gagal memproses foto")
                     }
                     currentPhotoPath = null
                     currentPhotoUri = null
                 }
             }
         } else {
-            showToast("Gagal mengambil foto")
+            showToast("Foto dibatalkan")
             currentPhotoPath = null
             currentPhotoUri = null
         }
@@ -79,61 +111,79 @@ class MediaManager(
 
     private val cameraPermissionLauncher = fragment.registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) launchCamera()
-        else showToast("Izin kamera diperlukan")
-    }
+    ) { granted -> if (granted) launchCamera() else showToast("Izin kamera diperlukan") }
 
-    // Voice launcher
     private val micPermissionLauncher = fragment.registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) startRecording()
-        else showToast("Izin mikrofon diperlukan")
-    }
+    ) { granted -> if (granted) startRecording() else showToast("Izin mikrofon diperlukan") }
 
-    // Public methods
+    // ── Public API ────────────────────────────────────────────────────────
+
     fun openCamera() {
-        if (ContextCompat.checkSelfPermission(fragment.requireContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(
+                fragment.requireContext(), Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
             launchCamera()
         } else {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
-    fun openVoiceRecorder() {
-        if (ContextCompat.checkSelfPermission(fragment.requireContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            startRecording()
+    /**
+     * Toggle: jika sedang recording → stop dan simpan.
+     * Jika tidak → minta izin dan mulai recording.
+     */
+    fun toggleVoiceRecording() {
+        if (_isRecording.value) {
+            stopRecording()
         } else {
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            if (ContextCompat.checkSelfPermission(
+                    fragment.requireContext(), Manifest.permission.RECORD_AUDIO
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                startRecording()
+            } else {
+                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
         }
     }
 
     fun stopRecording() {
+        if (!_isRecording.value) return
         try {
             mediaRecorder?.apply {
                 stop()
                 reset()
-            }
-            mediaRecorder = null
-            isRecording = false
-            recordingTimerJob?.cancel()
-            if (currentAudioFile != null) {
-                onVoiceRecorded(currentAudioFile!!.absolutePath)
-                showToast("Rekaman tersimpan")
+                release()
             }
         } catch (e: Exception) {
             Timber.e(e, "Error stopping recording")
+        } finally {
+            mediaRecorder = null
+            _isRecording.value = false
+            recordingTimerJob?.cancel()
+            _recordingSeconds.value = 0
+            currentAudioFile?.let { file ->
+                if (file.exists() && file.length() > 0) {
+                    onVoiceRecorded(file.absolutePath)
+                    showToast("Rekaman tersimpan (${file.name})")
+                } else {
+                    showToast("File rekaman kosong, coba lagi")
+                }
+            }
+            currentAudioFile = null
         }
     }
 
     fun release() {
-        if (isRecording) stopRecording()
+        if (_isRecording.value) stopRecording()
         mediaRecorder?.release()
         recordingTimerJob?.cancel()
     }
 
-    // Private methods
+    // ── Private: Camera ───────────────────────────────────────────────────
+
     private fun launchCamera() {
         try {
             val photoFile = createImageFile()
@@ -158,40 +208,54 @@ class MediaManager(
         return file
     }
 
-    private suspend fun addWatermark(originalPath: String): String? = withContext(Dispatchers.IO) {
-        try {
-            val originalBitmap = BitmapFactory.decodeFile(originalPath) ?: return@withContext null
-            val mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
-            val canvas = Canvas(mutableBitmap)
-            val paint = Paint().apply {
-                color = Color.WHITE
-                textSize = 40f
-                isAntiAlias = true
-                setShadowLayer(5f, 2f, 2f, Color.BLACK)
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    private suspend fun addWatermark(originalPath: String, meta: PhotoMetadata): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val originalBitmap = BitmapFactory.decodeFile(originalPath) ?: return@withContext null
+                val mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+                val canvas = Canvas(mutableBitmap)
+
+                val bgPaint = Paint().apply {
+                    color = Color.argb(140, 0, 0, 0)
+                }
+                canvas.drawRect(0f, 0f, mutableBitmap.width.toFloat(), 220f, bgPaint)
+
+                val paint = Paint().apply {
+                    color = Color.WHITE
+                    textSize = 38f
+                    isAntiAlias = true
+                    typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                }
+
+                val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                val distStr = if (meta.distanceMeters < 1000) {
+                    "STA: ${meta.distanceMeters.toInt()} m"
+                } else {
+                    "STA: ${String.format("%.2f", meta.distanceMeters / 1000)} km"
+                }
+                val gpsStr = "GPS: ${
+                    String.format("%.6f", meta.latitude)
+                }, ${String.format("%.6f", meta.longitude)}"
+                val roadStr = if (meta.roadName.isNotBlank()) "Ruas: ${meta.roadName}" else "RoadSense"
+
+                val lines = listOf("📍 $roadStr", "🕐 $dateStr", "📏 $distStr", "🌐 $gpsStr")
+                var y = 52f
+                lines.forEach { line ->
+                    canvas.drawText(line, 30f, y, paint)
+                    y += 52f
+                }
+
+                File(originalPath).outputStream().use { out ->
+                    mutableBitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
+                }
+                originalBitmap.recycle()
+                mutableBitmap.recycle()
+                originalPath
+            } catch (e: Exception) {
+                Timber.e(e, "Gagal menambahkan watermark")
+                null
             }
-            var y = 80f
-            // Text lines should be passed from outside; for now we use simple ones
-            // In real usage, pass them as parameter
-            listOf(
-                "RoadSense Basic",
-                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
-                "Jarak: 0 m" // placeholder
-            ).forEach { line ->
-                canvas.drawText(line, 50f, y, paint)
-                y += 60f
-            }
-            File(originalPath).outputStream().use { out ->
-                mutableBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
-            }
-            originalBitmap.recycle()
-            mutableBitmap.recycle()
-            originalPath
-        } catch (e: Exception) {
-            Timber.e(e, "Gagal menambahkan watermark")
-            null
         }
-    }
 
     private suspend fun saveToPublicGallery(sourcePath: String) = withContext(Dispatchers.IO) {
         try {
@@ -199,6 +263,7 @@ class MediaManager(
             val displayName = "RoadSense_$timestamp.jpg"
             val sourceFile = File(sourcePath)
             val context = fragment.requireContext()
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
                     put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
@@ -208,69 +273,84 @@ class MediaManager(
                 }
                 val resolver = context.contentResolver
                 val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                if (uri != null) {
-                    resolver.openOutputStream(uri)?.use { out -> sourceFile.inputStream().use { it.copyTo(out) } }
+                uri?.let {
+                    resolver.openOutputStream(it)?.use { out -> sourceFile.inputStream().copyTo(out) }
                     values.clear()
                     values.put(MediaStore.Images.Media.IS_PENDING, 0)
-                    resolver.update(uri, values, null, null)
+                    resolver.update(it, values, null, null)
                 }
             } else {
                 val publicPictures = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
                 val destDir = File(publicPictures, "RoadSense").apply { mkdirs() }
-                val destFile = File(destDir, displayName)
-                sourceFile.copyTo(destFile, overwrite = true)
-                MediaScannerConnection.scanFile(context, arrayOf(destFile.absolutePath), arrayOf("image/jpeg"), null)
+                sourceFile.copyTo(File(destDir, displayName), overwrite = true)
+                MediaScannerConnection.scanFile(context, arrayOf(File(destDir, displayName).absolutePath), arrayOf("image/jpeg"), null)
             }
         } catch (e: Exception) {
             Timber.e(e, "Gagal menyimpan foto ke galeri")
         }
     }
 
+    // ── Private: Voice ────────────────────────────────────────────────────
+
     private fun startRecording() {
-        if (ContextCompat.checkSelfPermission(fragment.requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            return
-        }
+        if (_isRecording.value) return // Guard: jangan double start
         try {
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val audioDir = fragment.requireContext().getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-            val audioFile = File(audioDir, "ROADSENSE_AUDIO_${timestamp}.mp4")
+            val audioFile = File(audioDir, "ROADSENSE_VOICE_${timestamp}.mp4")
             currentAudioFile = audioFile
-            mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                MediaRecorder(fragment.requireContext())
-            } else {
-                @Suppress("DEPRECATION")
-                MediaRecorder()
-            }.apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
-                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setAudioSamplingRate(44100)
-                setAudioEncodingBitRate(128000)
-                setOutputFile(audioFile.absolutePath)
-                prepare()
-                start()
-            }
-            isRecording = true
-            recordingSeconds = 0
+
+            mediaRecorder = (
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        MediaRecorder(fragment.requireContext())
+                    } else {
+                        @Suppress("DEPRECATION")
+                        MediaRecorder()
+                    }
+                    ).apply {
+                    setAudioSource(MediaRecorder.AudioSource.MIC)
+                    setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                    setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                    setAudioSamplingRate(44100)
+                    setAudioEncodingBitRate(128000)
+                    setMaxDuration(MAX_RECORDING_SECONDS * 1000)
+                    setOutputFile(audioFile.absolutePath)
+                    setOnInfoListener { _, what, _ ->
+                        if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
+                            Timber.d("Max recording duration reached, auto-stopping")
+                            stopRecording()
+                        }
+                    }
+                    prepare()
+                    start()
+                }
+
+            _isRecording.value = true
+            _recordingSeconds.value = 0
             startRecordingTimer()
+            showToast("⏺ Merekam... (max ${MAX_RECORDING_SECONDS}s)")
         } catch (e: Exception) {
             Timber.e(e, "Failed to start recording")
-            showToast("Gagal memulai rekaman")
+            showToast("Gagal memulai rekaman: ${e.message}")
+            mediaRecorder?.release()
+            mediaRecorder = null
+            currentAudioFile = null
         }
     }
 
     private fun startRecordingTimer() {
         recordingTimerJob?.cancel()
         recordingTimerJob = lifecycleScope.launch {
-            while (isRecording) {
-                recordingSeconds++
+            while (_isRecording.value) {
                 delay(1000L)
+                _recordingSeconds.value++
             }
         }
     }
 
     private fun showToast(message: String) {
-        android.widget.Toast.makeText(fragment.requireContext(), message, android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(
+            fragment.requireContext(), message, android.widget.Toast.LENGTH_SHORT
+        ).show()
     }
 }

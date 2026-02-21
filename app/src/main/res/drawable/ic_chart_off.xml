@@ -1,23 +1,27 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
-    android:tint="#888888">
-    <!-- Bar kiri -->
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+
+    <!-- Background -->
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M5,9h3v10H5z"/>
-    <!-- Bar tengah -->
+        android:fillColor="#0D47A1"
+        android:pathData="M16,2A14,14 0 1,1 15.9,2Z"/>
+
+    <!-- Bars -->
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M10,5h3v14h-3z"/>
-    <!-- Bar kanan -->
+        android:fillColor="#BBDEFB"
+        android:pathData="M9,20H12V14H9Z"/>
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M15,12h3v7h-3z"/>
-    <!-- Garis silang (off) -->
+        android:fillColor="#90CAF9"
+        android:pathData="M14,20H17V10H14Z"/>
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M4,4l16,16M20,4l-16,16"/>
+        android:fillColor="#64B5F6"
+        android:pathData="M19,20H22V16H19Z"/>
+
+    <!-- Line overlay -->
+    <path
+        android:fillColor="#FF5252"
+        android:pathData="M8,15L13,11L18,13L23,9L23,11L18,15L13,13L8,17Z"/>
 </vector>

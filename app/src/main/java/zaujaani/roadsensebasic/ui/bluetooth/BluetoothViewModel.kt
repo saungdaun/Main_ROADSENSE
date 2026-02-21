@@ -27,8 +27,13 @@ class BluetoothViewModel @Inject constructor(
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    // Raw line untuk debug/log — dari BluetoothGateway_v2.rawLine
     private val _receivedData = MutableStateFlow("")
     val receivedData: StateFlow<String> = _receivedData.asStateFlow()
+
+    // Data terparse ESP32 — dari BluetoothGateway_v2.esp32Data
+    private val _esp32Data = MutableStateFlow<BluetoothGateway.Esp32Data?>(null)
+    val esp32Data: StateFlow<BluetoothGateway.Esp32Data?> = _esp32Data.asStateFlow()
 
     data class BluetoothDeviceInfo(
         val name: String,
@@ -42,11 +47,18 @@ class BluetoothViewModel @Inject constructor(
                 _connectionState.value = state
             }
         }
+        // FIX: rawLine bukan receivedData (nama berubah di BluetoothGateway_v2)
         viewModelScope.launch {
-            bluetoothGateway.receivedData.collect { data ->
-                if (data.isNotBlank()) {
-                    _receivedData.value = data
+            bluetoothGateway.rawLine.collect { line ->
+                if (line.isNotBlank()) {
+                    _receivedData.value = line
                 }
+            }
+        }
+        // Tambahan: collect data ESP32 terparse
+        viewModelScope.launch {
+            bluetoothGateway.esp32Data.collect { data: BluetoothGateway.Esp32Data? ->
+                _esp32Data.value = data
             }
         }
     }
@@ -63,8 +75,8 @@ class BluetoothViewModel @Inject constructor(
                     device.address
                 }
                 BluetoothDeviceInfo(
-                    name = deviceName,
-                    address = device.address,
+                    name     = deviceName,
+                    address  = device.address,
                     isBonded = true
                 )
             }
@@ -73,7 +85,6 @@ class BluetoothViewModel @Inject constructor(
     }
 
     fun connectToDevice(address: String) {
-        // Gateway mengelola coroutine-nya sendiri di gatewayScope
         bluetoothGateway.connect(address)
     }
 
@@ -87,5 +98,6 @@ class BluetoothViewModel @Inject constructor(
 
     fun clearReceivedData() {
         _receivedData.value = ""
+        _esp32Data.value = null
     }
 }

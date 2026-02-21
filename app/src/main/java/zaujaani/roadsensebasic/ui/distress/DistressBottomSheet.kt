@@ -11,7 +11,6 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.media.MediaRecorder
 import android.media.MediaScannerConnection
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -54,78 +53,76 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
 
     private val viewModel: DistressViewModel by viewModels()
 
-    // State
+    // ── State ─────────────────────────────────────────────────────────────
     private var selectedType: DistressType? = null
     private var selectedSeverity: Severity? = null
     private var currentPhotoPath: String? = null
     private var currentAudioFile: File? = null
+
     private var isRecording = false
     private var mediaRecorder: MediaRecorder? = null
     private var recordingTimerJob: Job? = null
-    private var recordingSeconds = 0
+    private var _recordingSeconds = 0
 
-    // Camera
+    companion object {
+        private const val MAX_RECORDING_SECONDS = 30
+    }
+
+    // ── Camera launcher ───────────────────────────────────────────────────
     private val takePictureLauncher =
         registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             val path = currentPhotoPath
-            if (success && path != null) {
-                val file = File(path)
-                if (file.exists()) {
-                    // Ambil data watermark
-                    val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-                    val distance = viewModel.getCurrentDistance().toInt()
-                    val location = viewModel.getCurrentLocation()
-                    val lat = location?.latitude?.let { String.format(Locale.getDefault(), "%.6f", it) } ?: "N/A"
-                    val lon = location?.longitude?.let { String.format(Locale.getDefault(), "%.6f", it) } ?: "N/A"
-                    val roadName = viewModel.getRoadName()
+            if (success && path != null && File(path).exists()) {
+                val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                val distance  = viewModel.getCurrentDistance().toInt()
+                val location  = viewModel.getCurrentLocation()
+                val lat = location?.latitude?.let  { String.format(Locale.US, "%.6f", it) } ?: "N/A"
+                val lon = location?.longitude?.let { String.format(Locale.US, "%.6f", it) } ?: "N/A"
+                val roadName  = viewModel.getRoadName()
+                val typeLabel = selectedType?.displayName ?: ""
 
-                    val textLines = buildList {
-                        add(getString(R.string.watermark_app_name))
-                        add(timestamp)
-                        add(getString(R.string.watermark_distance, distance))
-                        add(getString(R.string.watermark_coord, lat, lon))
-                        if (roadName.isNotBlank()) add(roadName)
-                    }
+                val textLines = buildList {
+                    add("RoadSense SDI")
+                    add(timestamp)
+                    add("STA: $distance m  |  $typeLabel")
+                    add("GPS: $lat, $lon")
+                    if (roadName.isNotBlank()) add("Ruas: $roadName")
+                }
 
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        val processedPath = addWatermarkToImage(path, textLines)
-                        withContext(Dispatchers.Main) {
-                            if (processedPath != null) {
-                                // Simpan ke galeri publik
-                                saveImageToPublicGallery(processedPath)
-                                // Tampilkan thumbnail
-                                binding.ivPhotoThumb.visibility = View.VISIBLE
-                                val bitmap = BitmapFactory.decodeFile(processedPath)
-                                binding.ivPhotoThumb.setImageBitmap(bitmap)
-                                Toast.makeText(requireContext(), getString(R.string.photo_saved), Toast.LENGTH_SHORT).show()
-                                Timber.d("Foto distress dengan watermark disimpan di: $processedPath")
-                            } else {
-                                Toast.makeText(requireContext(), getString(R.string.photo_failed), Toast.LENGTH_SHORT).show()
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val processed = addWatermarkToImage(path, textLines)
+                    withContext(Dispatchers.Main) {
+                        if (processed != null) {
+                            lifecycleScope.launch(Dispatchers.IO) { saveImageToPublicGallery(processed) }
+                            binding.ivPhotoThumb.visibility = View.VISIBLE
+                            BitmapFactory.decodeFile(processed)?.let { bmp ->
+                                binding.ivPhotoThumb.setImageBitmap(bmp)
                             }
+                            showToast(getString(R.string.photo_saved))
+                        } else {
+                            showToast(getString(R.string.photo_failed))
                         }
                     }
-                } else {
-                    Toast.makeText(requireContext(), getString(R.string.file_not_found), Toast.LENGTH_SHORT).show()
-                    currentPhotoPath = null
                 }
             } else {
-                Toast.makeText(requireContext(), getString(R.string.photo_failed), Toast.LENGTH_SHORT).show()
+                showToast(getString(R.string.photo_failed))
                 currentPhotoPath = null
             }
         }
 
-    private val cameraPermissionLauncher =
+    private val cameraPermLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) launchCamera()
-            else Toast.makeText(requireContext(), getString(R.string.camera_permission_required), Toast.LENGTH_SHORT).show()
+            else showToast(getString(R.string.camera_permission_required))
         }
 
-    // Voice
-    private val micPermissionLauncher =
+    private val micPermLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) startRecording()
-            else Toast.makeText(requireContext(), getString(R.string.microphone_permission_required), Toast.LENGTH_SHORT).show()
+            else showToast(getString(R.string.microphone_permission_required))
         }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -138,22 +135,18 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupDropdowns()
-        setupQuickButtons()
         setupListeners()
-        updateUnitLabel()
+        refreshQuickButtons()   // preset default sebelum tipe dipilih
 
         viewModel.saveResult.observe(viewLifecycleOwner) { result ->
             when (result) {
                 is SaveResult.Success -> {
-                    Toast.makeText(requireContext(), getString(R.string.distress_saved), Toast.LENGTH_SHORT).show()
+                    showToast(getString(R.string.distress_saved))
                     dismiss()
                 }
-                is SaveResult.Error -> {
-                    Toast.makeText(requireContext(), result.message, Toast.LENGTH_SHORT).show()
-                }
-                SaveResult.Loading -> {}
+                is SaveResult.Error -> showToast(result.message)
+                SaveResult.Loading  -> { /* progress sudah ada di tombol disable */ }
             }
         }
     }
@@ -166,71 +159,94 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
         _binding = null
     }
 
+    // ── Dropdown setup ────────────────────────────────────────────────────
+
     private fun setupDropdowns() {
-        // Distress Type dropdown
-        val distressAdapter = ArrayAdapter(
+        // Jenis Kerusakan
+        val typeAdapter = ArrayAdapter(
             requireContext(),
             android.R.layout.simple_dropdown_item_1line,
             DistressType.entries.map { it.displayName }
         )
-        binding.actvDistressType.setAdapter(distressAdapter)
-
+        binding.actvDistressType.setAdapter(typeAdapter)
+        binding.actvDistressType.setOnClickListener { binding.actvDistressType.showDropDown() }
         binding.actvDistressType.setOnItemClickListener { _, _, position, _ ->
             selectedType = DistressType.entries[position]
-            updateUnitLabel()
+            onDistressTypeSelected(selectedType!!)
         }
 
-        binding.actvDistressType.setOnClickListener {
-            binding.actvDistressType.showDropDown()
-        }
-
-        // Severity dropdown
+        // Tingkat Keparahan
         val severityAdapter = ArrayAdapter(
             requireContext(),
             android.R.layout.simple_dropdown_item_1line,
             Severity.entries.map { it.displayName }
         )
         binding.actvSeverity.setAdapter(severityAdapter)
-
+        binding.actvSeverity.setOnClickListener { binding.actvSeverity.showDropDown() }
         binding.actvSeverity.setOnItemClickListener { _, _, position, _ ->
             selectedSeverity = Severity.entries[position]
         }
-
-        binding.actvSeverity.setOnClickListener {
-            binding.actvSeverity.showDropDown()
-        }
     }
 
-    private fun setupQuickButtons() {
-        binding.btnQuick5.setOnClickListener { binding.etLengthArea.setText(getString(R.string.quick_5)) }
-        binding.btnQuick10.setOnClickListener { binding.etLengthArea.setText(getString(R.string.quick_10)) }
-        binding.btnQuick20.setOnClickListener { binding.etLengthArea.setText(getString(R.string.quick_20)) }
-        binding.btnQuick50.setOnClickListener { binding.etLengthArea.setText(getString(R.string.quick_50)) }
+    /**
+     * Dipanggil saat jenis kerusakan dipilih dari dropdown.
+     * Update: satuan, panduan surveyor, preset tombol cepat.
+     */
+    private fun onDistressTypeSelected(type: DistressType) {
+        // Satuan: m atau m²
+        binding.tvUnitLabel.text = type.unit
+
+        // Panduan surveyor — getSurveyorGuide() adalah fungsi di DistressType
+        binding.tvSurveyorGuide.text = type.getSurveyorGuide()
+        binding.tvSurveyorGuide.visibility = View.VISIBLE
+
+        // Reset input lama
+        binding.etLengthArea.text?.clear()
+
+        // Update preset tombol
+        refreshQuickButtons()
+    }
+
+    /**
+     * Update label & nilai 4 tombol preset cepat.
+     * getQuickPresets() adalah fungsi di DistressType yang mengembalikan
+     * List<Pair<String, Double>> — label ke nilai.
+     */
+    private fun refreshQuickButtons() {
+        val presets: List<Pair<String, Double>> =
+            selectedType?.getQuickPresets()
+                ?: listOf("5m" to 5.0, "10m" to 10.0, "20m" to 20.0, "50m" to 50.0)
+
+        val buttons = listOf(
+            binding.btnQuick5,
+            binding.btnQuick10,
+            binding.btnQuick20,
+            binding.btnQuick50
+        )
+
+        presets.forEachIndexed { index, (label, value) ->
+            buttons.getOrNull(index)?.apply {
+                text = label
+                setOnClickListener {
+                    binding.etLengthArea.setText(value.toString())
+                }
+            }
+        }
     }
 
     private fun setupListeners() {
         binding.btnAddPhoto.setOnClickListener { openCamera() }
-        binding.btnVoice.setOnClickListener {
-            if (isRecording) stopRecording() else startRecording()
-        }
-        binding.btnSave.setOnClickListener { saveDistress() }
+        binding.btnVoice.setOnClickListener   { toggleVoiceRecording() }
+        binding.btnSave.setOnClickListener    { saveDistress() }
     }
 
-    private fun updateUnitLabel() {
-        val unit = when (selectedType) {
-            DistressType.CRACK -> getString(R.string.unit_length)
-            DistressType.POTHole -> getString(R.string.unit_area)
-            else -> getString(R.string.unit_default)
-        }
-        binding.tvUnitLabel.text = unit
-    }
+    // ── Camera ────────────────────────────────────────────────────────────
 
     private fun openCamera() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            launchCamera()
-        } else {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
+            == PackageManager.PERMISSION_GRANTED
+        ) launchCamera()
+        else cameraPermLauncher.launch(Manifest.permission.CAMERA)
     }
 
     private fun launchCamera() {
@@ -244,56 +260,214 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
             takePictureLauncher.launch(uri)
         } catch (e: IOException) {
             Timber.e(e, "Error creating photo file")
-            Toast.makeText(requireContext(), getString(R.string.photo_failed), Toast.LENGTH_SHORT).show()
+            showToast(getString(R.string.photo_failed))
         }
     }
 
     private fun createImageFile(): File {
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val storageDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-        val file = File(storageDir, "ROADSENSE_${timestamp}.jpg")
+        val ts   = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val dir  = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        val file = File(dir, "ROADSENSE_SDI_$ts.jpg")
         currentPhotoPath = file.absolutePath
         return file
     }
 
-    // Watermark dan Gallery
+    // ── Voice: toggle start/stop ──────────────────────────────────────────
+
+    private fun toggleVoiceRecording() {
+        if (isRecording) stopRecording()
+        else {
+            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED
+            ) startRecording()
+            else micPermLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun startRecording() {
+        if (isRecording) return
+        try {
+            val ts        = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val audioDir  = requireContext().getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+            val audioFile = File(audioDir, "ROADSENSE_SDI_AUDIO_$ts.mp4")
+            currentAudioFile = audioFile
+
+            mediaRecorder = (
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                        MediaRecorder(requireContext())
+                    else
+                        @Suppress("DEPRECATION") MediaRecorder()
+                    ).apply {
+                    setAudioSource(MediaRecorder.AudioSource.MIC)
+                    setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                    setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                    setAudioSamplingRate(44100)
+                    setAudioEncodingBitRate(128000)
+                    setMaxDuration(MAX_RECORDING_SECONDS * 1000)
+                    setOutputFile(audioFile.absolutePath)
+                    setOnInfoListener { _, what, _ ->
+                        // Auto-stop saat batas waktu tercapai
+                        if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
+                            stopRecording()
+                        }
+                    }
+                    prepare()
+                    start()
+                }
+
+            isRecording      = true
+            _recordingSeconds = 0
+            startRecordingTimer()
+            updateVoiceButtonState()
+            showToast("⏺ Merekam... (maks ${MAX_RECORDING_SECONDS}d)")
+
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to start recording")
+            showToast(getString(R.string.recording_failed))
+            mediaRecorder?.release()
+            mediaRecorder    = null
+            currentAudioFile = null
+        }
+    }
+
+    private fun stopRecording() {
+        try {
+            mediaRecorder?.apply { stop(); reset(); release() }
+        } catch (e: Exception) {
+            Timber.e(e, "Error stopping recording")
+        } finally {
+            mediaRecorder    = null
+            isRecording      = false
+            _recordingSeconds = 0
+            recordingTimerJob?.cancel()
+            updateVoiceButtonState()
+
+            val file = currentAudioFile
+            if (file != null && file.exists() && file.length() > 0) {
+                showToast(getString(R.string.audio_saved))
+            } else {
+                currentAudioFile = null
+                showToast("File rekaman kosong, coba lagi")
+            }
+        }
+    }
+
+    private fun startRecordingTimer() {
+        recordingTimerJob?.cancel()
+        recordingTimerJob = lifecycleScope.launch {
+            while (isRecording) {
+                delay(1000L)
+                _recordingSeconds++
+                // Tampilkan hitung mundur di tombol
+                if (_binding != null) {
+                    val remaining = MAX_RECORDING_SECONDS - _recordingSeconds
+                    binding.btnVoice.text = "⏹ Stop ($remaining d)"
+                }
+            }
+        }
+    }
+
+    private fun updateVoiceButtonState() {
+        if (_binding == null) return
+        if (isRecording) {
+            binding.btnVoice.text = getString(R.string.stop)
+            binding.btnVoice.setIconResource(R.drawable.ic_stop)
+        } else {
+            binding.btnVoice.text = getString(R.string.record_voice)
+            binding.btnVoice.setIconResource(R.drawable.ic_mic)
+        }
+    }
+
+    // ── Simpan distress ───────────────────────────────────────────────────
+
+    private fun saveDistress() {
+        val typeStr       = binding.actvDistressType.text.toString().trim()
+        val severityStr   = binding.actvSeverity.text.toString().trim()
+        val lengthAreaStr = binding.etLengthArea.text.toString().trim()
+        val notes         = binding.etNotes.text?.toString()?.trim() ?: ""
+
+        if (typeStr.isBlank()) {
+            showToast(getString(R.string.select_distress_type)); return
+        }
+        if (severityStr.isBlank()) {
+            showToast(getString(R.string.select_severity)); return
+        }
+        if (lengthAreaStr.isBlank()) {
+            showToast(getString(R.string.enter_length_area)); return
+        }
+
+        val type       = DistressType.entries.find { it.displayName == typeStr }
+        val severity   = Severity.entries.find { it.displayName == severityStr }
+        val lengthArea = lengthAreaStr.toDoubleOrNull()
+
+        if (type == null || severity == null || lengthArea == null || lengthArea <= 0) {
+            showToast(getString(R.string.invalid_data)); return
+        }
+
+        // Pastikan recording berhenti sebelum simpan
+        if (isRecording) stopRecording()
+
+        // Disable tombol supaya tidak double-submit
+        binding.btnSave.isEnabled = false
+
+        viewModel.saveDistress(
+            type         = type,
+            severity     = severity,
+            lengthOrArea = lengthArea,
+            photoPath    = currentPhotoPath ?: "",
+            audioPath    = currentAudioFile?.absolutePath ?: "",
+            notes        = notes
+        )
+    }
+
+    // ── Watermark foto ────────────────────────────────────────────────────
+
     private fun addWatermarkToImage(originalPath: String, textLines: List<String>): String? {
         return try {
-            val originalBitmap = BitmapFactory.decodeFile(originalPath) ?: return null
-            val mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
-            val canvas = Canvas(mutableBitmap)
+            val original = BitmapFactory.decodeFile(originalPath) ?: return null
+            val mutable  = original.copy(Bitmap.Config.ARGB_8888, true)
+            val canvas   = Canvas(mutable)
+
+            // Background gelap semi-transparan di belakang teks
+            val bgPaint = Paint().apply {
+                color = Color.argb(150, 0, 0, 0)
+            }
+            canvas.drawRect(0f, 0f, mutable.width.toFloat(), textLines.size * 56f + 24f, bgPaint)
 
             val paint = Paint().apply {
-                color = Color.WHITE
-                textSize = 40f
+                color       = Color.WHITE
+                textSize    = 38f
                 isAntiAlias = true
-                setShadowLayer(5f, 2f, 2f, Color.BLACK)
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                typeface    = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                setShadowLayer(4f, 2f, 2f, Color.BLACK)
             }
 
-            var y = 80f
-            for (line in textLines) {
-                canvas.drawText(line, 50f, y, paint)
-                y += 60f
+            var y = 52f
+            textLines.forEach { line ->
+                canvas.drawText(line, 24f, y, paint)
+                y += 56f
             }
 
             File(originalPath).outputStream().use { out ->
-                mutableBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                mutable.compress(Bitmap.CompressFormat.JPEG, 92, out)
             }
-            originalBitmap.recycle()
-            mutableBitmap.recycle()
+            original.recycle()
+            mutable.recycle()
             originalPath
+
         } catch (e: Exception) {
             Timber.e(e, "Gagal menambahkan watermark")
             null
         }
     }
 
+    // ── Simpan ke galeri publik ───────────────────────────────────────────
+
     private suspend fun saveImageToPublicGallery(sourcePath: String) = withContext(Dispatchers.IO) {
         try {
-            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val displayName = "RoadSense_Distress_$timestamp.jpg"
-            val sourceFile = File(sourcePath)
+            val ts          = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val displayName = "RoadSense_SDI_$ts.jpg"
+            val sourceFile  = File(sourcePath)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
@@ -305,139 +479,35 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
                 }
                 val resolver = requireContext().contentResolver
                 val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                if (uri != null) {
-                    resolver.openOutputStream(uri)?.use { out: OutputStream ->
-                        sourceFile.inputStream().use { it.copyTo(out) }
+                uri?.let {
+                    resolver.openOutputStream(it)?.use { out: OutputStream ->
+                        sourceFile.inputStream().copyTo(out)
                     }
                     values.clear()
                     values.put(MediaStore.Images.Media.IS_PENDING, 0)
-                    resolver.update(uri, values, null, null)
-                    Timber.d("Photo saved to gallery via MediaStore: $uri")
+                    resolver.update(it, values, null, null)
                 }
             } else {
-                val publicPictures = Environment.getExternalStoragePublicDirectory(
+                val pubDir  = Environment.getExternalStoragePublicDirectory(
                     Environment.DIRECTORY_PICTURES
                 )
-                val destDir = File(publicPictures, "RoadSense").apply { mkdirs() }
-                val destFile = File(destDir, displayName)
-                sourceFile.copyTo(destFile, overwrite = true)
-
+                val destDir = File(pubDir, "RoadSense").apply { mkdirs() }
+                val dest    = File(destDir, displayName)
+                sourceFile.copyTo(dest, overwrite = true)
                 MediaScannerConnection.scanFile(
                     requireContext(),
-                    arrayOf(destFile.absolutePath),
+                    arrayOf(dest.absolutePath),
                     arrayOf("image/jpeg"),
                     null
                 )
-                Timber.d("Photo saved to gallery: ${destFile.absolutePath}")
             }
         } catch (e: Exception) {
             Timber.e(e, "Gagal menyimpan foto ke galeri")
         }
     }
 
-    // Voice methods
-    private fun startRecording() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            return
-        }
-        try {
-            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val audioDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-            val audioFile = File(audioDir, "ROADSENSE_AUDIO_${timestamp}.mp4")
-            currentAudioFile = audioFile
+    // ── Helper ────────────────────────────────────────────────────────────
 
-            mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                MediaRecorder(requireContext())
-            } else {
-                @Suppress("DEPRECATION")
-                MediaRecorder()
-            }.apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
-                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setAudioSamplingRate(44100)
-                setAudioEncodingBitRate(128000)
-                setOutputFile(audioFile.absolutePath)
-                prepare()
-                start()
-            }
-
-            isRecording = true
-            recordingSeconds = 0
-            startRecordingTimer()
-            binding.btnVoice.text = getString(R.string.stop)
-            binding.btnVoice.setIconResource(R.drawable.ic_stop)
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to start recording")
-            Toast.makeText(requireContext(), getString(R.string.recording_failed), Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun stopRecording() {
-        try {
-            mediaRecorder?.apply {
-                stop()
-                reset()
-            }
-            mediaRecorder = null
-            isRecording = false
-            recordingTimerJob?.cancel()
-            binding.btnVoice.text = getString(R.string.record_voice)
-            binding.btnVoice.setIconResource(R.drawable.ic_mic)
-            if (currentAudioFile != null) {
-                Toast.makeText(requireContext(), getString(R.string.audio_saved), Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Error stopping recording")
-        }
-    }
-
-    private fun startRecordingTimer() {
-        recordingTimerJob?.cancel()
-        recordingTimerJob = lifecycleScope.launch {
-            while (isRecording) {
-                recordingSeconds++
-                delay(1000L)
-            }
-        }
-    }
-
-    private fun saveDistress() {
-        val typeStr = binding.actvDistressType.text.toString()
-        val severityStr = binding.actvSeverity.text.toString()
-        val lengthAreaStr = binding.etLengthArea.text.toString()
-        val notes = binding.etNotes.text.toString()
-
-        if (typeStr.isBlank()) {
-            Toast.makeText(requireContext(), getString(R.string.select_distress_type), Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (severityStr.isBlank()) {
-            Toast.makeText(requireContext(), getString(R.string.select_severity), Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (lengthAreaStr.isBlank()) {
-            Toast.makeText(requireContext(), getString(R.string.enter_length_area), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val type = DistressType.entries.find { it.displayName == typeStr }
-        val severity = Severity.entries.find { it.displayName == severityStr }
-        val lengthArea = lengthAreaStr.toDoubleOrNull()
-
-        if (type == null || severity == null || lengthArea == null) {
-            Toast.makeText(requireContext(), getString(R.string.invalid_data), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        viewModel.saveDistress(
-            type = type,
-            severity = severity,
-            lengthOrArea = lengthArea,
-            photoPath = currentPhotoPath ?: "",
-            audioPath = currentAudioFile?.absolutePath ?: "",
-            notes = notes
-        )
-    }
+    private fun showToast(msg: String) =
+        Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
 }
