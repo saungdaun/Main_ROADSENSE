@@ -6,6 +6,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import zaujaani.roadsensebasic.data.local.RoadSenseDatabase
 import zaujaani.roadsensebasic.data.local.dao.PhotoAnalysisDao
 import zaujaani.roadsensebasic.data.repository.PhotoAnalysisRepository
@@ -15,6 +18,7 @@ import zaujaani.roadsensebasic.domain.engine.*
 import zaujaani.roadsensebasic.gateway.BluetoothGateway
 import zaujaani.roadsensebasic.gateway.GPSGateway
 import zaujaani.roadsensebasic.gateway.SensorGateway
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -80,30 +84,47 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun providePCICalculator(): PCICalculator {           // ← BARU
+        return PCICalculator()
+    }
+
+    @Provides
+    @Singleton
+    @Named("applicationScope")
+    fun provideApplicationScope(): CoroutineScope {
+        return CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
+
+    @Provides
+    @Singleton
     fun provideSurveyEngine(
         sensorGateway: SensorGateway,
         telemetryRepository: TelemetryRepository,
         surveyRepository: SurveyRepository,
         vibrationAnalyzer: VibrationAnalyzer,
         confidenceCalculator: ConfidenceCalculator,
-        sdiCalculator: SDICalculator
+        sdiCalculator: SDICalculator,
+        pciCalculator: PCICalculator,                  // ← BARU
+        @Named("applicationScope") externalScope: CoroutineScope
     ): SurveyEngine {
         return SurveyEngine(
-            sensorGateway = sensorGateway,
-            telemetryRepository = telemetryRepository,
-            surveyRepository = surveyRepository,
-            vibrationAnalyzer = vibrationAnalyzer,
+            sensorGateway        = sensorGateway,
+            telemetryRepository  = telemetryRepository,
+            surveyRepository     = surveyRepository,
+            vibrationAnalyzer    = vibrationAnalyzer,
             confidenceCalculator = confidenceCalculator,
-            sdiCalculator = sdiCalculator
+            sdiCalculator        = sdiCalculator,
+            pciCalculator        = pciCalculator,      // ← BARU
+            externalScope        = externalScope
         )
     }
+
     @Provides
     @Singleton
     fun providePhotoAnalysisDao(db: RoadSenseDatabase): PhotoAnalysisDao {
         return db.photoAnalysisDao()
     }
 
-    // Repository analisis AI — akan dipakai oleh PhotoAnalysisViewModel
     @Provides
     @Singleton
     fun providePhotoAnalysisRepository(

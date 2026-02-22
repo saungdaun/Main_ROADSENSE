@@ -1,10 +1,7 @@
 package zaujaani.roadsensebasic.util
 
 import android.content.Context
-import zaujaani.roadsensebasic.data.local.entity.EventType
-import zaujaani.roadsensebasic.data.local.entity.RoadEvent
-import zaujaani.roadsensebasic.data.local.entity.SurveySession
-import zaujaani.roadsensebasic.data.local.entity.TelemetryRaw
+import zaujaani.roadsensebasic.data.local.entity.*
 import java.io.File
 import java.io.FileWriter
 import java.text.SimpleDateFormat
@@ -82,6 +79,7 @@ object FileExporter {
                         EventType.SURFACE_CHANGE -> "Permukaan: ${event.value}"
                         EventType.PHOTO -> "Foto"
                         EventType.VOICE -> "Rekaman"
+                        EventType.NOTE -> "Note"
                     }
                     w.write("    <name>$name</name>\n")
                     w.write("    <cmt>${event.notes ?: ""}</cmt>\n")
@@ -110,7 +108,8 @@ object FileExporter {
         sessionName: String,
         session: SurveySession,
         telemetries: List<TelemetryRaw>,
-        events: List<RoadEvent>
+        events: List<RoadEvent>,
+        segmentsPci: List<SegmentPci> = emptyList()   // ⭐ Tambahkan parameter PCI
     ): File? {
         val fileName = "RoadSense_${getFilenameDateFormat().format(Date())}.csv"
         val dir = context.getExternalFilesDir("Reports") ?: return null
@@ -166,6 +165,17 @@ object FileExporter {
                         w.write("# $surf,${len.toInt()} m,${String.format(Locale.US, "%.1f", pct)}%\n")
                     }
                     w.write("\n")
+
+                    // ⭐ Tambahkan ringkasan PCI jika ada data
+                    if (segmentsPci.isNotEmpty()) {
+                        w.write("# RINGKASAN PCI\n")
+                        segmentsPci.forEach { seg ->
+                            w.write("# Seg ${seg.segmentIndex},")
+                            w.write("${seg.startSta}-${seg.endSta},")
+                            w.write("PCI ${seg.pciScore}\n")
+                        }
+                        w.write("\n")
+                    }
                 }
 
                 // Header kolom telemetri

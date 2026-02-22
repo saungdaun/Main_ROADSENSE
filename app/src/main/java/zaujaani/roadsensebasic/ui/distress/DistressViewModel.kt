@@ -7,22 +7,17 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import zaujaani.roadsensebasic.data.local.entity.DistressType
-import zaujaani.roadsensebasic.data.local.entity.Severity
+import zaujaani.roadsensebasic.data.local.entity.*
 import zaujaani.roadsensebasic.data.repository.PhotoAnalysisRepository
 import zaujaani.roadsensebasic.domain.engine.SurveyEngine
 import zaujaani.roadsensebasic.domain.model.LocationData
 import javax.inject.Inject
-
-// ── SaveResult — sealed class untuk one-shot event ke UI ─────────────────
 
 sealed class SaveResult {
     object Loading : SaveResult()
     object Success : SaveResult()
     data class Error(val message: String) : SaveResult()
 }
-
-// ── ViewModel ─────────────────────────────────────────────────────────────
 
 @HiltViewModel
 class DistressViewModel @Inject constructor(
@@ -33,24 +28,13 @@ class DistressViewModel @Inject constructor(
     private val _saveResult = MutableLiveData<SaveResult>()
     val saveResult: LiveData<SaveResult> = _saveResult
 
-    // ── Akses data engine untuk BottomSheet ───────────────────────────────
-
+    // ── Akses data engine ───────────────────────────────────────────────
     fun getCurrentDistance(): Double = surveyEngine.getCurrentDistance()
-
     fun getCurrentLocation(): LocationData? = surveyEngine.getLastLocation()
-
     fun getRoadName(): String = surveyEngine.roadName.value
+    fun getSurveyMode(): SurveyMode = surveyEngine.getCurrentMode()
 
-    // ── Simpan distress item ──────────────────────────────────────────────
-
-    /**
-     * Simpan data kerusakan ke survey engine.
-     *
-     * Setelah berhasil disimpan:
-     * - Jika ada foto → otomatis didaftarkan ke antrian analisis AI (PENDING)
-     * - Analisis AI sendiri tidak dijalankan di sini — dijalankan nanti
-     *   dari SummaryFragment saat user tap "Analisis AI"
-     */
+    // ── Simpan distress item untuk SDI ──────────────────────────────────
     fun saveDistress(
         type: DistressType,
         severity: Severity,
@@ -68,7 +52,6 @@ class DistressViewModel @Inject constructor(
             }
 
             try {
-                // Simpan ke engine → engine simpan ke DB via SurveyRepository
                 surveyEngine.addDistressItem(
                     type         = type,
                     severity     = severity,
@@ -78,7 +61,6 @@ class DistressViewModel @Inject constructor(
                     notes        = notes.takeIf { it.isNotBlank() }
                 )
 
-                // Jika ada foto → daftarkan ke antrian analisis AI (non-blocking)
                 if (photoPath.isNotBlank()) {
                     registerPhotoForAnalysis(photoPath)
                 }
@@ -92,13 +74,46 @@ class DistressViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Daftarkan foto ke antrian analisis AI.
-     * Status awal = PENDING, analisis sebenarnya dijalankan dari SummaryFragment.
-     *
-     * Jika foto sudah pernah didaftarkan (misal DONE / FAILED), enqueuePhotosForSession
-     * akan skip otomatis (tidak duplikat).
-     */
+    // ── Simpan distress item untuk PCI (BARU) ───────────────────────────
+    fun savePciDistress(
+        type: PCIDistressType,
+        severity: Severity,
+        quantity: Double,
+        photoPath: String,
+        audioPath: String,
+        notes: String
+    ) {
+        viewModelScope.launch {
+            _saveResult.value = SaveResult.Loading
+
+            if (quantity <= 0) {
+                _saveResult.value = SaveResult.Error("Quantity harus lebih dari 0")
+                return@launch
+            }
+
+            try {
+                surveyEngine.addPciDistressItem(
+                    type       = type,
+                    severity   = severity,
+                    quantity   = quantity,
+                    photoPath  = photoPath,
+                    audioPath  = audioPath,
+                    notes      = notes
+                )
+
+                if (photoPath.isNotBlank()) {
+                    registerPhotoForAnalysis(photoPath)
+                }
+
+                _saveResult.value = SaveResult.Success
+
+            } catch (e: Exception) {
+                Timber.e(e, "Error saving PCI distress")
+                _saveResult.value = SaveResult.Error("Gagal menyimpan data: ${e.message}")
+            }
+        }
+    }
+
     private suspend fun registerPhotoForAnalysis(photoPath: String) {
         val sessionId = surveyEngine.getCurrentSessionId() ?: return
         try {
@@ -108,7 +123,6 @@ class DistressViewModel @Inject constructor(
             )
             Timber.d("Foto didaftarkan ke antrian AI: $photoPath")
         } catch (e: Exception) {
-            // Gagal daftarkan tidak boleh crash atau batalkan save distress
             Timber.w(e, "Gagal daftarkan foto ke antrian AI: $photoPath")
         }
     }

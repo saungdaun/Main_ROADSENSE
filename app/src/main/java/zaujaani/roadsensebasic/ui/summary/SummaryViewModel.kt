@@ -11,13 +11,16 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import zaujaani.roadsensebasic.data.local.entity.DistressItem
 import zaujaani.roadsensebasic.data.local.entity.EventType
+import zaujaani.roadsensebasic.data.local.entity.PCIDistressItem
 import zaujaani.roadsensebasic.data.local.entity.RoadEvent
+import zaujaani.roadsensebasic.data.local.entity.SegmentPci
 import zaujaani.roadsensebasic.data.local.entity.SegmentSdi
 import zaujaani.roadsensebasic.data.local.entity.SurveyMode
 import zaujaani.roadsensebasic.data.local.entity.SurveySession
 import zaujaani.roadsensebasic.data.repository.SessionWithCount
 import zaujaani.roadsensebasic.data.repository.SurveyRepository
 import zaujaani.roadsensebasic.data.repository.TelemetryRepository
+import zaujaani.roadsensebasic.domain.engine.PCIRating
 import zaujaani.roadsensebasic.util.FileExporter
 import zaujaani.roadsensebasic.util.PDFExporter
 import java.io.File
@@ -34,11 +37,18 @@ data class SessionDetailUi(
     val audioCount: Int,
     val conditionDistribution: Map<String, Double>,
     val surfaceDistribution: Map<String, Double>,
-    // SDI fields
+
+    // SDI
     val mode: SurveyMode,
     val segmentsSdi: List<SegmentSdi> = emptyList(),
     val distressItems: List<DistressItem> = emptyList(),
-    val averageSdi: Int = 0
+    val averageSdi: Int = 0,
+
+    // PCI ← BARU
+    val segmentsPci: List<SegmentPci> = emptyList(),
+    val pciDistressItems: List<PCIDistressItem> = emptyList(),
+    val averagePci: Int = -1,
+    val pciRating: PCIRating? = null
 )
 
 @HiltViewModel
@@ -89,43 +99,44 @@ class SummaryViewModel @Inject constructor(
                 }
 
                 val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
-                val events = surveyRepository.getEventsForSession(sessionId)
+                val events      = surveyRepository.getEventsForSession(sessionId)
 
-                val totalDistance = session.totalDistance
+                val totalDistance   = session.totalDistance
                 val durationMinutes = ((session.endTime ?: session.startTime) - session.startTime) / 60000
 
                 val avgConfidence = if (telemetries.isNotEmpty()) {
-                    telemetries.map { (100 - (it.gpsAccuracy * 2)).coerceIn(0f, 100f).toInt() }.average().roundToInt()
+                    telemetries.map { (100 - (it.gpsAccuracy * 2)).coerceIn(0f, 100f).toInt() }
+                        .average().roundToInt()
                 } else 0
 
                 val photoCount = events.count { it.eventType == EventType.PHOTO }
                 val audioCount = events.count { it.eventType == EventType.VOICE }
 
+                // Hitung distribusi kondisi & permukaan dari telemetri
                 val conditionMap = mutableMapOf<String, Double>()
-                val surfaceMap = mutableMapOf<String, Double>()
-
+                val surfaceMap   = mutableMapOf<String, Double>()
                 if (telemetries.size >= 2) {
-                    var lastDist = telemetries.first().cumulativeDistance
+                    var lastDist      = telemetries.first().cumulativeDistance
                     var lastCondition = telemetries.first().condition.name
-                    var lastSurface = telemetries.first().surface.name
-
+                    var lastSurface   = telemetries.first().surface.name
                     for (i in 1 until telemetries.size) {
-                        val t = telemetries[i]
+                        val t     = telemetries[i]
                         val delta = t.cumulativeDistance - lastDist
                         if (delta > 0) {
                             conditionMap[lastCondition] = conditionMap.getOrDefault(lastCondition, 0.0) + delta
-                            surfaceMap[lastSurface] = surfaceMap.getOrDefault(lastSurface, 0.0) + delta
+                            surfaceMap[lastSurface]     = surfaceMap.getOrDefault(lastSurface, 0.0) + delta
                         }
-                        lastDist = t.cumulativeDistance
+                        lastDist      = t.cumulativeDistance
                         lastCondition = t.condition.name
-                        lastSurface = t.surface.name
+                        lastSurface   = t.surface.name
                     }
                 }
 
-                // Ambil data SDI
                 val mode = session.mode
+
+                // ── SDI data ──────────────────────────────────────────────
                 val segmentsSdi = if (mode == SurveyMode.SDI) {
-                    surveyRepository.getSegmentsForSessionOnce(sessionId)
+                    surveyRepository.getSegmentSdiForSessionOnce(sessionId)
                 } else emptyList()
 
                 val distressItems = if (mode == SurveyMode.SDI) {
@@ -136,23 +147,44 @@ class SummaryViewModel @Inject constructor(
                     segmentsSdi.map { it.sdiScore }.average().toInt()
                 } else 0
 
+                // ── PCI data ← BARU ───────────────────────────────────────
+                val segmentsPci = if (mode == SurveyMode.PCI) {
+                    surveyRepository.getSegmentPciForSessionOnce(sessionId)
+                } else emptyList()
+
+                val pciDistressItems = if (mode == SurveyMode.PCI) {
+                    surveyRepository.getPciDistressForSession(sessionId)
+                } else emptyList()
+
+                val averagePci = if (segmentsPci.isNotEmpty()) {
+                    segmentsPci.filter { it.pciScore >= 0 }
+                        .map { it.pciScore }
+                        .let { scores -> if (scores.isNotEmpty()) scores.average().toInt() else -1 }
+                } else session.avgPci
+
+                val pciRating = if (averagePci >= 0) PCIRating.fromScore(averagePci) else null
+
                 val detail = SessionDetailUi(
-                    session = session,
-                    events = events,
-                    totalDistance = totalDistance,
-                    durationMinutes = durationMinutes.toInt(),
-                    avgConfidence = avgConfidence,
-                    photoCount = photoCount,
-                    audioCount = audioCount,
+                    session              = session,
+                    events               = events,
+                    totalDistance        = totalDistance,
+                    durationMinutes      = durationMinutes.toInt(),
+                    avgConfidence        = avgConfidence,
+                    photoCount           = photoCount,
+                    audioCount           = audioCount,
                     conditionDistribution = conditionMap,
-                    surfaceDistribution = surfaceMap,
-                    mode = mode,
-                    segmentsSdi = segmentsSdi,
-                    distressItems = distressItems,
-                    averageSdi = averageSdi
+                    surfaceDistribution  = surfaceMap,
+                    mode                 = mode,
+                    segmentsSdi          = segmentsSdi,
+                    distressItems        = distressItems,
+                    averageSdi           = averageSdi,
+                    segmentsPci          = segmentsPci,       // ← BARU
+                    pciDistressItems     = pciDistressItems,  // ← BARU
+                    averagePci           = averagePci,        // ← BARU
+                    pciRating            = pciRating          // ← BARU
                 )
                 _sessionDetail.value = detail
-                Timber.d("Loaded detail for session $sessionId with ${telemetries.size} telemetry points, avgConfidence=$avgConfidence, mode=$mode")
+                Timber.d("Loaded detail: sessionId=$sessionId mode=$mode avgSdi=$averageSdi avgPci=$averagePci")
             } catch (e: Exception) {
                 Timber.e(e, "Gagal memuat detail sesi $sessionId")
                 _sessionDetail.value = null
@@ -175,18 +207,20 @@ class SummaryViewModel @Inject constructor(
         }
     }
 
+    // ── Export ────────────────────────────────────────────────────────────
+
     fun exportSessionToGpx(sessionId: Long, callback: (File?) -> Unit) {
         viewModelScope.launch {
             try {
-                val session = surveyRepository.getSessionById(sessionId) ?: return@launch callback(null)
+                val session     = surveyRepository.getSessionById(sessionId) ?: return@launch callback(null)
                 val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
                 if (telemetries.isEmpty()) return@launch callback(null)
                 val events = surveyRepository.getEventsForSession(sessionId)
                 val file = FileExporter.exportToGpx(
-                    context = context,
+                    context     = context,
                     sessionName = "RoadSense_${session.startTime}",
                     telemetries = telemetries,
-                    events = events
+                    events      = events
                 )
                 callback(file)
             } catch (e: Exception) {
@@ -199,15 +233,15 @@ class SummaryViewModel @Inject constructor(
     fun exportSessionToCsv(sessionId: Long, callback: (File?) -> Unit) {
         viewModelScope.launch {
             try {
-                val session = surveyRepository.getSessionById(sessionId) ?: return@launch callback(null)
+                val session     = surveyRepository.getSessionById(sessionId) ?: return@launch callback(null)
                 val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
-                val events = surveyRepository.getEventsForSession(sessionId)
+                val events      = surveyRepository.getEventsForSession(sessionId)
                 val file = FileExporter.exportToCsv(
-                    context = context,
+                    context     = context,
                     sessionName = "RoadSense_${session.startTime}",
-                    session = session,
+                    session     = session,
                     telemetries = telemetries,
-                    events = events
+                    events      = events
                 )
                 callback(file)
             } catch (e: Exception) {
@@ -220,55 +254,63 @@ class SummaryViewModel @Inject constructor(
     fun exportSessionToPdf(sessionId: Long, callback: (File?) -> Unit) {
         viewModelScope.launch {
             try {
-                val session = surveyRepository.getSessionById(sessionId) ?: return@launch callback(null)
+                val session     = surveyRepository.getSessionById(sessionId) ?: return@launch callback(null)
                 val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
-                val events = surveyRepository.getEventsForSession(sessionId)
-                val mode = session.mode
+                val events      = surveyRepository.getEventsForSession(sessionId)
+                val mode        = session.mode
 
                 val segmentsSdi = if (mode == SurveyMode.SDI) {
-                    surveyRepository.getSegmentsForSessionOnce(sessionId)
+                    surveyRepository.getSegmentSdiForSessionOnce(sessionId)
                 } else emptyList()
 
                 val distressItems = if (mode == SurveyMode.SDI) {
                     surveyRepository.getDistressForSession(sessionId)
                 } else emptyList()
 
-                // Hitung avgConfidence
+                // ← BARU: data PCI untuk PDF
+                val segmentsPci = if (mode == SurveyMode.PCI) {
+                    surveyRepository.getSegmentPciForSessionOnce(sessionId)
+                } else emptyList()
+
+                val pciDistressItems = if (mode == SurveyMode.PCI) {
+                    surveyRepository.getPciDistressForSession(sessionId)
+                } else emptyList()
+
                 val avgConfidence = if (telemetries.isNotEmpty()) {
-                    telemetries.map { (100 - (it.gpsAccuracy * 2)).coerceIn(0f, 100f).toInt() }.average().roundToInt()
+                    telemetries.map { (100 - (it.gpsAccuracy * 2)).coerceIn(0f, 100f).toInt() }
+                        .average().roundToInt()
                 } else 0
 
-                // Hitung distribusi kondisi dan permukaan
                 val conditionMap = mutableMapOf<String, Double>()
-                val surfaceMap = mutableMapOf<String, Double>()
-
+                val surfaceMap   = mutableMapOf<String, Double>()
                 if (telemetries.size >= 2) {
-                    var lastDist = telemetries.first().cumulativeDistance
+                    var lastDist      = telemetries.first().cumulativeDistance
                     var lastCondition = telemetries.first().condition.name
-                    var lastSurface = telemetries.first().surface.name
-
+                    var lastSurface   = telemetries.first().surface.name
                     for (i in 1 until telemetries.size) {
-                        val t = telemetries[i]
+                        val t     = telemetries[i]
                         val delta = t.cumulativeDistance - lastDist
                         if (delta > 0) {
                             conditionMap[lastCondition] = conditionMap.getOrDefault(lastCondition, 0.0) + delta
-                            surfaceMap[lastSurface] = surfaceMap.getOrDefault(lastSurface, 0.0) + delta
+                            surfaceMap[lastSurface]     = surfaceMap.getOrDefault(lastSurface, 0.0) + delta
                         }
-                        lastDist = t.cumulativeDistance
+                        lastDist      = t.cumulativeDistance
                         lastCondition = t.condition.name
-                        lastSurface = t.surface.name
+                        lastSurface   = t.surface.name
                     }
                 }
 
                 val file = PDFExporter.exportToPdf(
-                    context = context,
-                    session = session,
-                    telemetries = telemetries,
-                    events = events,
-                    segmentsSdi = segmentsSdi,
-                    distressItems = distressItems,
+                    context               = context,
+                    session               = session,
+                    telemetries           = telemetries,
+                    events                = events,
+                    segmentsSdi           = segmentsSdi,
+                    distressItems         = distressItems,
                     conditionDistribution = conditionMap,
-                    surfaceDistribution = surfaceMap
+                    surfaceDistribution   = surfaceMap,
+                    segmentsPci           = segmentsPci,      // ← BARU
+                    pciDistressItems      = pciDistressItems  // ← BARU
                 )
                 callback(file)
             } catch (e: Exception) {

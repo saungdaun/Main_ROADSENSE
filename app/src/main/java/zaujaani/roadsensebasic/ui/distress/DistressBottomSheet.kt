@@ -35,8 +35,7 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import zaujaani.roadsensebasic.BuildConfig
 import zaujaani.roadsensebasic.R
-import zaujaani.roadsensebasic.data.local.entity.DistressType
-import zaujaani.roadsensebasic.data.local.entity.Severity
+import zaujaani.roadsensebasic.data.local.entity.*
 import zaujaani.roadsensebasic.databinding.BottomSheetDistressBinding
 import java.io.File
 import java.io.IOException
@@ -54,7 +53,8 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
     private val viewModel: DistressViewModel by viewModels()
 
     // ── State ─────────────────────────────────────────────────────────────
-    private var selectedType: DistressType? = null
+    private var selectedSdiType: DistressType? = null
+    private var selectedPciType: PCIDistressType? = null
     private var selectedSeverity: Severity? = null
     private var currentPhotoPath: String? = null
     private var currentAudioFile: File? = null
@@ -79,10 +79,15 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
                 val lat = location?.latitude?.let  { String.format(Locale.US, "%.6f", it) } ?: "N/A"
                 val lon = location?.longitude?.let { String.format(Locale.US, "%.6f", it) } ?: "N/A"
                 val roadName  = viewModel.getRoadName()
-                val typeLabel = selectedType?.displayName ?: ""
+                val mode      = viewModel.getSurveyMode()
+                val typeLabel = if (mode == SurveyMode.PCI) {
+                    selectedPciType?.displayName ?: ""
+                } else {
+                    selectedSdiType?.displayName ?: ""
+                }
 
                 val textLines = buildList {
-                    add("RoadSense SDI")
+                    add("RoadSense Survey")
                     add(timestamp)
                     add("STA: $distance m  |  $typeLabel")
                     add("GPS: $lat, $lon")
@@ -162,17 +167,35 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
     // ── Dropdown setup ────────────────────────────────────────────────────
 
     private fun setupDropdowns() {
-        // Jenis Kerusakan
-        val typeAdapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_dropdown_item_1line,
-            DistressType.entries.map { it.displayName }
-        )
-        binding.actvDistressType.setAdapter(typeAdapter)
-        binding.actvDistressType.setOnClickListener { binding.actvDistressType.showDropDown() }
-        binding.actvDistressType.setOnItemClickListener { _, _, position, _ ->
-            selectedType = DistressType.entries[position]
-            onDistressTypeSelected(selectedType!!)
+        val mode = viewModel.getSurveyMode()
+
+        // Jenis Kerusakan (berdasarkan mode)
+        if (mode == SurveyMode.PCI) {
+            val pciTypeAdapter = ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_dropdown_item_1line,
+                PCIDistressType.entries.map { it.displayName }
+            )
+            binding.actvDistressType.setAdapter(pciTypeAdapter)
+            binding.actvDistressType.setOnClickListener { binding.actvDistressType.showDropDown() }
+            binding.actvDistressType.setOnItemClickListener { _, _, position, _ ->
+                selectedPciType = PCIDistressType.entries[position]
+                selectedSdiType = null
+                onDistressTypeSelected()
+            }
+        } else {
+            val sdiTypeAdapter = ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_dropdown_item_1line,
+                DistressType.entries.map { it.displayName }
+            )
+            binding.actvDistressType.setAdapter(sdiTypeAdapter)
+            binding.actvDistressType.setOnClickListener { binding.actvDistressType.showDropDown() }
+            binding.actvDistressType.setOnItemClickListener { _, _, position, _ ->
+                selectedSdiType = DistressType.entries[position]
+                selectedPciType = null
+                onDistressTypeSelected()
+            }
         }
 
         // Tingkat Keparahan
@@ -192,30 +215,41 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
      * Dipanggil saat jenis kerusakan dipilih dari dropdown.
      * Update: satuan, panduan surveyor, preset tombol cepat.
      */
-    private fun onDistressTypeSelected(type: DistressType) {
-        // Satuan: m atau m²
-        binding.tvUnitLabel.text = type.unit
-
-        // Panduan surveyor — getSurveyorGuide() adalah fungsi di DistressType
-        binding.tvSurveyorGuide.text = type.getSurveyorGuide()
-        binding.tvSurveyorGuide.visibility = View.VISIBLE
-
-        // Reset input lama
-        binding.etLengthArea.text?.clear()
-
-        // Update preset tombol
-        refreshQuickButtons()
+    private fun onDistressTypeSelected() {
+        val mode = viewModel.getSurveyMode()
+        if (mode == SurveyMode.PCI) {
+            val type = selectedPciType
+            if (type != null) {
+                binding.tvUnitLabel.text = type.unitLabel
+                binding.tvSurveyorGuide.text = type.getSurveyorGuide()
+                binding.tvSurveyorGuide.visibility = View.VISIBLE
+                binding.etLengthArea.text?.clear()
+                refreshQuickButtons()
+            }
+        } else {
+            val type = selectedSdiType
+            if (type != null) {
+                binding.tvUnitLabel.text = type.unit
+                binding.tvSurveyorGuide.text = type.getSurveyorGuide()
+                binding.tvSurveyorGuide.visibility = View.VISIBLE
+                binding.etLengthArea.text?.clear()
+                refreshQuickButtons()
+            }
+        }
     }
 
     /**
      * Update label & nilai 4 tombol preset cepat.
-     * getQuickPresets() adalah fungsi di DistressType yang mengembalikan
-     * List<Pair<String, Double>> — label ke nilai.
      */
     private fun refreshQuickButtons() {
-        val presets: List<Pair<String, Double>> =
-            selectedType?.getQuickPresets()
+        val mode = viewModel.getSurveyMode()
+        val presets: List<Pair<String, Double>> = if (mode == SurveyMode.PCI) {
+            selectedPciType?.getQuickPresets()
+                ?: listOf("5" to 5.0, "10" to 10.0, "20" to 20.0, "50" to 50.0)
+        } else {
+            selectedSdiType?.getQuickPresets()
                 ?: listOf("5m" to 5.0, "10m" to 10.0, "20m" to 20.0, "50m" to 50.0)
+        }
 
         val buttons = listOf(
             binding.btnQuick5,
@@ -267,7 +301,7 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
     private fun createImageFile(): File {
         val ts   = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val dir  = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-        val file = File(dir, "ROADSENSE_SDI_$ts.jpg")
+        val file = File(dir, "ROADSENSE_${ts}.jpg")
         currentPhotoPath = file.absolutePath
         return file
     }
@@ -289,7 +323,7 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
         try {
             val ts        = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val audioDir  = requireContext().getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-            val audioFile = File(audioDir, "ROADSENSE_SDI_AUDIO_$ts.mp4")
+            val audioFile = File(audioDir, "ROADSENSE_AUDIO_$ts.mp4")
             currentAudioFile = audioFile
 
             mediaRecorder = (
@@ -306,7 +340,6 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
                     setMaxDuration(MAX_RECORDING_SECONDS * 1000)
                     setOutputFile(audioFile.absolutePath)
                     setOnInfoListener { _, what, _ ->
-                        // Auto-stop saat batas waktu tercapai
                         if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
                             stopRecording()
                         }
@@ -358,7 +391,6 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
             while (isRecording) {
                 delay(1000L)
                 _recordingSeconds++
-                // Tampilkan hitung mundur di tombol
                 if (_binding != null) {
                     val remaining = MAX_RECORDING_SECONDS - _recordingSeconds
                     binding.btnVoice.text = "⏹ Stop ($remaining d)"
@@ -383,7 +415,7 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
     private fun saveDistress() {
         val typeStr       = binding.actvDistressType.text.toString().trim()
         val severityStr   = binding.actvSeverity.text.toString().trim()
-        val lengthAreaStr = binding.etLengthArea.text.toString().trim()
+        val quantityStr   = binding.etLengthArea.text.toString().trim()
         val notes         = binding.etNotes.text?.toString()?.trim() ?: ""
 
         if (typeStr.isBlank()) {
@@ -392,32 +424,54 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
         if (severityStr.isBlank()) {
             showToast(getString(R.string.select_severity)); return
         }
-        if (lengthAreaStr.isBlank()) {
+        if (quantityStr.isBlank()) {
             showToast(getString(R.string.enter_length_area)); return
         }
 
-        val type       = DistressType.entries.find { it.displayName == typeStr }
-        val severity   = Severity.entries.find { it.displayName == severityStr }
-        val lengthArea = lengthAreaStr.toDoubleOrNull()
+        val severity = Severity.entries.find { it.displayName == severityStr }
+        val quantity = quantityStr.toDoubleOrNull()
 
-        if (type == null || severity == null || lengthArea == null || lengthArea <= 0) {
+        if (severity == null || quantity == null || quantity <= 0) {
             showToast(getString(R.string.invalid_data)); return
         }
 
         // Pastikan recording berhenti sebelum simpan
         if (isRecording) stopRecording()
 
-        // Disable tombol supaya tidak double-submit
         binding.btnSave.isEnabled = false
 
-        viewModel.saveDistress(
-            type         = type,
-            severity     = severity,
-            lengthOrArea = lengthArea,
-            photoPath    = currentPhotoPath ?: "",
-            audioPath    = currentAudioFile?.absolutePath ?: "",
-            notes        = notes
-        )
+        val mode = viewModel.getSurveyMode()
+        if (mode == SurveyMode.PCI) {
+            val type = PCIDistressType.entries.find { it.displayName == typeStr }
+            if (type == null) {
+                showToast("Jenis kerusakan tidak valid")
+                binding.btnSave.isEnabled = true
+                return
+            }
+            viewModel.savePciDistress(
+                type       = type,
+                severity   = severity,
+                quantity   = quantity,
+                photoPath  = currentPhotoPath ?: "",
+                audioPath  = currentAudioFile?.absolutePath ?: "",
+                notes      = notes
+            )
+        } else {
+            val type = DistressType.entries.find { it.displayName == typeStr }
+            if (type == null) {
+                showToast("Jenis kerusakan tidak valid")
+                binding.btnSave.isEnabled = true
+                return
+            }
+            viewModel.saveDistress(
+                type         = type,
+                severity     = severity,
+                lengthOrArea = quantity,
+                photoPath    = currentPhotoPath ?: "",
+                audioPath    = currentAudioFile?.absolutePath ?: "",
+                notes        = notes
+            )
+        }
     }
 
     // ── Watermark foto ────────────────────────────────────────────────────
@@ -428,7 +482,6 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
             val mutable  = original.copy(Bitmap.Config.ARGB_8888, true)
             val canvas   = Canvas(mutable)
 
-            // Background gelap semi-transparan di belakang teks
             val bgPaint = Paint().apply {
                 color = Color.argb(150, 0, 0, 0)
             }
@@ -466,7 +519,7 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
     private suspend fun saveImageToPublicGallery(sourcePath: String) = withContext(Dispatchers.IO) {
         try {
             val ts          = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val displayName = "RoadSense_SDI_$ts.jpg"
+            val displayName = "RoadSense_$ts.jpg"
             val sourceFile  = File(sourcePath)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -505,8 +558,6 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
             Timber.e(e, "Gagal menyimpan foto ke galeri")
         }
     }
-
-    // ── Helper ────────────────────────────────────────────────────────────
 
     private fun showToast(msg: String) =
         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()

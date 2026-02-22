@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 8,
-    "identityHash": "fa824f4ef280e380f9a808b5024b81cd",
+    "version": 9,
+    "identityHash": "b83629b1f140244cdb1223d54d213f79",
     "entities": [
       {
         "tableName": "telemetry_raw",
@@ -151,7 +151,7 @@
       },
       {
         "tableName": "survey_sessions",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `roadName` TEXT NOT NULL, `surveyorName` TEXT NOT NULL, `mode` TEXT NOT NULL, `startTime` INTEGER NOT NULL, `endTime` INTEGER, `deviceModel` TEXT NOT NULL, `totalDistance` REAL NOT NULL, `avgConfidence` INTEGER NOT NULL, `avgSdi` INTEGER NOT NULL, `startLat` REAL NOT NULL, `startLng` REAL NOT NULL, `endLat` REAL NOT NULL, `endLng` REAL NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `roadName` TEXT NOT NULL, `surveyorName` TEXT NOT NULL, `mode` TEXT NOT NULL, `startTime` INTEGER NOT NULL, `endTime` INTEGER, `deviceModel` TEXT NOT NULL, `totalDistance` REAL NOT NULL, `avgConfidence` INTEGER NOT NULL, `avgSdi` INTEGER NOT NULL, `avgPci` INTEGER NOT NULL, `startLat` REAL NOT NULL, `startLng` REAL NOT NULL, `endLat` REAL NOT NULL, `endLng` REAL NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -210,6 +210,12 @@
           {
             "fieldPath": "avgSdi",
             "columnName": "avgSdi",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "avgPci",
+            "columnName": "avgPci",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -797,12 +803,301 @@
         },
         "indices": [],
         "foreignKeys": []
+      },
+      {
+        "tableName": "segment_pci",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER NOT NULL, `segmentIndex` INTEGER NOT NULL, `startSta` TEXT NOT NULL, `endSta` TEXT NOT NULL, `startLat` REAL NOT NULL, `startLng` REAL NOT NULL, `segmentLengthM` REAL NOT NULL, `laneWidthM` REAL NOT NULL, `sampleAreaM2` REAL NOT NULL, `pciScore` INTEGER NOT NULL, `pciRating` TEXT NOT NULL, `correctedDeductValue` REAL NOT NULL, `distressCount` INTEGER NOT NULL, `dominantDistressType` TEXT NOT NULL, `deductValuesJson` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, FOREIGN KEY(`sessionId`) REFERENCES `survey_sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentIndex",
+            "columnName": "segmentIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startSta",
+            "columnName": "startSta",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endSta",
+            "columnName": "endSta",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startLat",
+            "columnName": "startLat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startLng",
+            "columnName": "startLng",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentLengthM",
+            "columnName": "segmentLengthM",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "laneWidthM",
+            "columnName": "laneWidthM",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sampleAreaM2",
+            "columnName": "sampleAreaM2",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pciScore",
+            "columnName": "pciScore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pciRating",
+            "columnName": "pciRating",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correctedDeductValue",
+            "columnName": "correctedDeductValue",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "distressCount",
+            "columnName": "distressCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dominantDistressType",
+            "columnName": "dominantDistressType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deductValuesJson",
+            "columnName": "deductValuesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_segment_pci_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_segment_pci_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          },
+          {
+            "name": "index_segment_pci_sessionId_segmentIndex",
+            "unique": true,
+            "columnNames": [
+              "sessionId",
+              "segmentIndex"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_segment_pci_sessionId_segmentIndex` ON `${TABLE_NAME}` (`sessionId`, `segmentIndex`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "survey_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "pci_distress_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `segmentId` INTEGER NOT NULL, `sessionId` INTEGER NOT NULL, `type` TEXT NOT NULL, `severity` TEXT NOT NULL, `quantity` REAL NOT NULL, `notes` TEXT NOT NULL, `density` REAL NOT NULL, `deductValue` REAL NOT NULL, `photoPath` TEXT NOT NULL, `audioPath` TEXT NOT NULL, `gpsLat` REAL NOT NULL, `gpsLng` REAL NOT NULL, `sta` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, FOREIGN KEY(`segmentId`) REFERENCES `segment_pci`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentId",
+            "columnName": "segmentId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "severity",
+            "columnName": "severity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quantity",
+            "columnName": "quantity",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "density",
+            "columnName": "density",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deductValue",
+            "columnName": "deductValue",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "photoPath",
+            "columnName": "photoPath",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "audioPath",
+            "columnName": "audioPath",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gpsLat",
+            "columnName": "gpsLat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gpsLng",
+            "columnName": "gpsLng",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sta",
+            "columnName": "sta",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_pci_distress_items_segmentId",
+            "unique": false,
+            "columnNames": [
+              "segmentId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pci_distress_items_segmentId` ON `${TABLE_NAME}` (`segmentId`)"
+          },
+          {
+            "name": "index_pci_distress_items_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pci_distress_items_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "segment_pci",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "segmentId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
       }
     ],
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'fa824f4ef280e380f9a808b5024b81cd')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b83629b1f140244cdb1223d54d213f79')"
     ]
   }
 }

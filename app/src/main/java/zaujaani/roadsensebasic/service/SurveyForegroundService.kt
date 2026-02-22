@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 import zaujaani.roadsensebasic.R
 import zaujaani.roadsensebasic.domain.engine.SurveyEngine
@@ -35,34 +34,20 @@ import zaujaani.roadsensebasic.util.Constants
 import javax.inject.Inject
 
 /**
- * SurveyForegroundService — versi 2
+ * SurveyForegroundService v2.1
  *
- * Perubahan dari v1:
+ * FIX dari v2:
  *
- * FIX 1 — GPS accuracy filter
- *   Titik GPS dengan akurasi > GPS_ACCURACY_THRESHOLD diabaikan di service,
- *   tidak diteruskan ke engine. Mencegah data posisi jelek masuk DB.
+ * FIX #8 — Sync engine state saat pause/resume dari notification shade
+ *   Sebelumnya: ACTION_PAUSE/RESUME dari notifikasi hanya stop/start GPS collection
+ *   tapi tidak memanggil surveyEngine.pauseSurvey()/resumeSurvey().
+ *   Akibatnya: engine.sessionState tetap SURVEYING saat GPS sudah berhenti,
+ *   menyebabkan state mismatch antara engine dan service.
  *
- * FIX 2 & 3 — Tombol Pause/Resume di notifikasi
- *   Saat survey aktif  → notifikasi punya aksi [Pause] [Stop]
- *   Saat survey paused → notifikasi punya aksi [Resume] [Stop]
- *   Surveyor bisa control dari notification shade tanpa buka app.
+ *   FIX: Tambahkan serviceScope.launch { surveyEngine.pauseSurvey() / resumeSurvey() }
+ *   di ACTION_PAUSE dan ACTION_RESUME handler.
  *
- * FIX 4 — onTaskRemoved aware terhadap state pause
- *   Jika service di-kill MIUI saat paused → restart dengan ACTION_PAUSE,
- *   bukan ACTION_START. Survey tidak tiba-tiba jalan lagi.
- *
- * FIX 5 — flushTelemetry awaited sebelum scope dibatalkan
- *   onDestroy: flush dulu secara blocking, baru cancel scope.
- *   Data tidak hilang saat app di-kill.
- *
- * FIX 6 — Notifikasi tampilkan kecepatan + jarak
- *   Format: "42 km/h  •  1.23 km"
- *   Berguna saat layar mati, surveyor tahu app masih jalan.
- *
- * FIX 7 — WakeLock renewable untuk survey panjang
- *   WakeLock direnew setiap 90 menit via coroutine loop.
- *   Survey > 2 jam (jalan provinsi) tidak akan putus di background.
+ * Fix sebelumnya dari v2 tetap ada (WakeLock, Pause/Resume UI, etc).
  */
 @AndroidEntryPoint
 class SurveyForegroundService : android.app.Service() {
@@ -78,16 +63,14 @@ class SurveyForegroundService : android.app.Service() {
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var isManuallyStopped = false
-    private var isPausedState = false           // FIX 4: simpan state pause untuk restart
+    private var isPausedState = false
     private var lastNotificationUpdate = 0L
-    private var lastKnownSpeedKmh = 0f         // FIX 6: simpan speed terakhir untuk notifikasi
+    private var lastKnownSpeedKmh = 0f
 
     companion object {
-        // FIX 7: Perpendek satu segmen WakeLock, renew berkala
-        private const val WAKE_LOCK_SINGLE_MS  = 90 * 60 * 1000L   // 90 menit per segment
-        private const val WAKE_LOCK_RENEW_MS   = 85 * 60 * 1000L   // renew setelah 85 menit
-
-        private const val NOTIF_THROTTLE_MS    = 3_000L             // max update notifikasi
+        private const val WAKE_LOCK_SINGLE_MS = 90 * 60 * 1000L
+        private const val WAKE_LOCK_RENEW_MS  = 85 * 60 * 1000L
+        private const val NOTIF_THROTTLE_MS   = 3_000L
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -98,7 +81,7 @@ class SurveyForegroundService : android.app.Service() {
         super.onCreate()
         createNotificationChannel()
         acquireWakeLock()
-        startWakeLockRenewal()      // FIX 7: mulai loop renew
+        startWakeLockRenewal()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -117,15 +100,33 @@ class SurveyForegroundService : android.app.Service() {
             Constants.ACTION_PAUSE -> {
                 isPausedState = true
                 stopCollecting()
-                // FIX 2: ganti notifikasi ke mode pause (tombol Resume)
                 updateNotification(getString(R.string.survey_paused), paused = true)
+
+                // FIX #8: sync engine state — sebelumnya ini HILANG
+                serviceScope.launch {
+                    try {
+                        surveyEngine.pauseSurvey()
+                        Timber.d("Engine paused from notification")
+                    } catch (e: Exception) {
+                        Timber.e(e, "Error pausing engine from notification")
+                    }
+                }
             }
 
             Constants.ACTION_RESUME -> {
                 isPausedState = false
                 startCollecting()
-                // FIX 2: kembalikan notifikasi ke mode aktif (tombol Pause)
                 updateNotification(getString(R.string.survey_running), paused = false)
+
+                // FIX #8: sync engine state — sebelumnya ini HILANG
+                serviceScope.launch {
+                    try {
+                        surveyEngine.resumeSurvey()
+                        Timber.d("Engine resumed from notification")
+                    } catch (e: Exception) {
+                        Timber.e(e, "Error resuming engine from notification")
+                    }
+                }
             }
 
             Constants.ACTION_STOP -> {
@@ -138,15 +139,13 @@ class SurveyForegroundService : android.app.Service() {
             }
         }
 
-        // START_STICKY: MIUI akan restart service jika di-kill OS
         return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        // FIX 5: flush telemetry SEBELUM cancel scope
-        // Gunakan blocking scope baru yang tidak dibatalkan
+        // Flush telemetry sebelum cancel scope
         val flushScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         flushScope.launch {
             try {
@@ -166,12 +165,10 @@ class SurveyForegroundService : android.app.Service() {
         super.onDestroy()
     }
 
-    // FIX 4: restart sadar state paused
     override fun onTaskRemoved(rootIntent: Intent?) {
         if (!isManuallyStopped) {
             Timber.d("Task removed, restarting service (paused=$isPausedState)")
             val restartIntent = Intent(applicationContext, SurveyForegroundService::class.java).apply {
-                // Jika sebelumnya paused → restart ke paused (tidak aktifkan GPS)
                 action = if (isPausedState) Constants.ACTION_PAUSE else Constants.ACTION_START
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -186,7 +183,7 @@ class SurveyForegroundService : android.app.Service() {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // COLLECTING GPS + SENSOR
+    // GPS COLLECTION
     // ══════════════════════════════════════════════════════════════════
 
     private fun startCollecting() {
@@ -194,24 +191,17 @@ class SurveyForegroundService : android.app.Service() {
         sensorGateway.startListening()
 
         gpsJob = gpsGateway.getLocationFlow()
-            .catch { e ->
-                Timber.e(e, "GPS flow error")
-                // Service tetap hidup meski GPS error sementara
-            }
+            .catch { e -> Timber.e(e, "GPS flow error") }
             .onEach { location ->
-
-                // FIX 1: filter GPS tidak akurat sebelum masuk engine
+                // GPS accuracy filter: buang titik buruk
                 if (location.accuracy > Constants.GPS_ACCURACY_THRESHOLD) {
-                    Timber.v("GPS point dibuang: akurasi ${location.accuracy}m > threshold")
+                    Timber.v("GPS point discarded: accuracy ${location.accuracy}m > threshold")
                     return@onEach
                 }
 
                 surveyEngine.updateLocation(location.toLocationData())
-
-                // FIX 6: simpan speed terakhir untuk notifikasi
                 lastKnownSpeedKmh = location.speed * 3.6f
 
-                // Throttle update notifikasi
                 val now = System.currentTimeMillis()
                 if (now - lastNotificationUpdate > NOTIF_THROTTLE_MS) {
                     refreshNotification()
@@ -228,7 +218,7 @@ class SurveyForegroundService : android.app.Service() {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // WAKE LOCK — FIX 7: renewable
+    // WAKE LOCK
     // ══════════════════════════════════════════════════════════════════
 
     private fun acquireWakeLock() {
@@ -238,15 +228,10 @@ class SurveyForegroundService : android.app.Service() {
             "RoadSense::SurveyWakeLock"
         ).apply {
             acquire(WAKE_LOCK_SINGLE_MS)
-            Timber.d("WakeLock acquired (${WAKE_LOCK_SINGLE_MS / 60_000} menit)")
+            Timber.d("WakeLock acquired (${WAKE_LOCK_SINGLE_MS / 60_000} min)")
         }
     }
 
-    /**
-     * FIX 7: Loop renew WakeLock setiap 85 menit.
-     * Pola: release lama → acquire baru → tunggu 85 menit → ulangi.
-     * Survey > 2 jam bisa jalan tanpa putus.
-     */
     private fun startWakeLockRenewal() {
         wakeLockRenewJob = serviceScope.launch {
             while (true) {
@@ -255,10 +240,11 @@ class SurveyForegroundService : android.app.Service() {
                     wakeLock?.let { wl ->
                         if (wl.isHeld) {
                             wl.release()
-                            Timber.d("WakeLock direnew")
+                            Timber.d("WakeLock released for renewal")
                         }
                     }
                     acquireWakeLock()
+                    Timber.d("WakeLock renewed")
                 } catch (e: Exception) {
                     Timber.e(e, "Error renewing WakeLock")
                 }
@@ -277,7 +263,7 @@ class SurveyForegroundService : android.app.Service() {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // NOTIFICATION — FIX 2, 3, 6
+    // NOTIFICATION
     // ══════════════════════════════════════════════════════════════════
 
     private fun refreshNotification() {
@@ -287,8 +273,6 @@ class SurveyForegroundService : android.app.Service() {
         } else {
             getString(R.string.distance_km_format, dist / 1000.0)
         }
-
-        // FIX 6: tampilkan kecepatan + jarak
         val speedText = if (lastKnownSpeedKmh > 0.5f) {
             "${lastKnownSpeedKmh.toInt()} km/h  •  $distText"
         } else {
@@ -309,35 +293,21 @@ class SurveyForegroundService : android.app.Service() {
                 enableLights(false)
                 enableVibration(false)
             }
-            getSystemService(NotificationManager::class.java)
-                ?.createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
         }
     }
 
-    /**
-     * FIX 2 & 3: Bangun notifikasi dengan aksi yang sesuai state.
-     *
-     * State aktif  → [Pause ⏸] [Stop ⏹]
-     * State paused → [Resume ▶] [Stop ⏹]
-     */
     private fun buildNotification(contentText: String, paused: Boolean): Notification {
-        // Intent: tap notifikasi → buka MainActivity
         val openAppIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        // Intent: tombol Stop
         val stopIntent = PendingIntent.getService(
             this, 1,
-            Intent(this, SurveyForegroundService::class.java).apply {
-                action = Constants.ACTION_STOP
-            },
+            Intent(this, SurveyForegroundService::class.java).apply { action = Constants.ACTION_STOP },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        // Intent: tombol Pause atau Resume (tergantung state)
         val toggleIntent = PendingIntent.getService(
             this, 2,
             Intent(this, SurveyForegroundService::class.java).apply {
@@ -361,9 +331,9 @@ class SurveyForegroundService : android.app.Service() {
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
-            .setOnlyAlertOnce(true)         // tidak bunyi tiap update
+            .setOnlyAlertOnce(true)
             .setContentIntent(openAppIntent)
-            .addAction(toggleIcon, toggleLabel, toggleIntent)   // Pause / Resume
+            .addAction(toggleIcon, toggleLabel, toggleIntent)
             .addAction(R.drawable.ic_stop, getString(R.string.stop), stopIntent)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
@@ -371,13 +341,8 @@ class SurveyForegroundService : android.app.Service() {
 
     private fun updateNotification(text: String, paused: Boolean) {
         val notification = buildNotification(text, paused)
-        getSystemService(NotificationManager::class.java)
-            ?.notify(Constants.NOTIFICATION_ID, notification)
+        getSystemService(NotificationManager::class.java)?.notify(Constants.NOTIFICATION_ID, notification)
     }
-
-    // ══════════════════════════════════════════════════════════════════
-    // EXTENSION
-    // ══════════════════════════════════════════════════════════════════
 
     private fun Location.toLocationData(): LocationData = LocationData(
         latitude  = latitude,

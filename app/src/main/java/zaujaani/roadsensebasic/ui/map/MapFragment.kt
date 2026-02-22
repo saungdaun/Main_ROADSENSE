@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -242,7 +243,6 @@ class MapFragment : Fragment() {
             }
         }
 
-        // FIX: toggle start/stop recording — sebelumnya always start
         fabVoice.setOnClickListener {
             if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
                 mediaManager.toggleVoiceRecording()
@@ -265,11 +265,11 @@ class MapFragment : Fragment() {
 
         fabAddDistress.setOnClickListener {
             if (viewModel.isSurveying.value && !viewModel.isPaused.value
-                && viewModel.mode.value == SurveyMode.SDI
+                && (viewModel.mode.value == SurveyMode.SDI || viewModel.mode.value == SurveyMode.PCI)
             ) {
                 DistressBottomSheet().show(childFragmentManager, "DistressBottomSheet")
             } else {
-                showToast(getString(R.string.sdi_mode_required))
+                showToast(getString(R.string.distress_mode_required))
             }
         }
     }
@@ -292,6 +292,14 @@ class MapFragment : Fragment() {
         val etRoadName   = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etRoadName)
         val radioGeneral = dialogView.findViewById<RadioButton>(R.id.radioGeneral)
         val radioSdi     = dialogView.findViewById<RadioButton>(R.id.radioSdi)
+        val radioPci     = dialogView.findViewById<RadioButton>(R.id.radioPci)
+        val layoutLaneWidth = dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.layoutLaneWidth)
+        val etLaneWidth  = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etLaneWidth)
+
+        val radioGroup = dialogView.findViewById<RadioGroup>(R.id.radioGroupMode)
+        radioGroup.setOnCheckedChangeListener { _, checkedId ->
+            layoutLaneWidth.visibility = if (checkedId == R.id.radioPci) View.VISIBLE else View.GONE
+        }
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.start_survey))
@@ -299,13 +307,23 @@ class MapFragment : Fragment() {
             .setPositiveButton(getString(R.string.start)) { _, _ ->
                 val surveyor = etSurveyor?.text?.toString()?.trim() ?: ""
                 val roadName = etRoadName?.text?.toString()?.trim() ?: ""
-                val mode     = if (radioSdi.isChecked) SurveyMode.SDI else SurveyMode.GENERAL
 
                 if (surveyor.isBlank()) {
                     showToast(getString(R.string.surveyor_name_required))
                     return@setPositiveButton
                 }
-                viewModel.startSurvey(surveyor, roadName, mode)
+
+                val mode = when (radioGroup.checkedRadioButtonId) {
+                    R.id.radioSdi -> SurveyMode.SDI
+                    R.id.radioPci -> SurveyMode.PCI
+                    else -> SurveyMode.GENERAL
+                }
+
+                val laneWidth = if (mode == SurveyMode.PCI) {
+                    etLaneWidth.text?.toString()?.toDoubleOrNull() ?: 3.7
+                } else 3.7
+
+                viewModel.startSurvey(surveyor, roadName, mode, laneWidth)
             }
             .setNegativeButton(getString(R.string.cancel), null)
             .show()
@@ -402,17 +420,18 @@ class MapFragment : Fragment() {
             }
         }.launchIn(viewLifecycleOwner.lifecycleScope)
 
-        // Mode SDI vs GENERAL → tampilkan FAB yang sesuai
+        // Mode → tampilkan FAB yang sesuai
         combine(viewModel.mode, viewModel.isSurveying) { mode, surveying ->
             mode to surveying
         }.onEach { (mode, surveying) ->
-            val isSdi = mode == SurveyMode.SDI
             if (surveying) {
-                fabCondition.visibility   = if (isSdi) View.GONE else View.VISIBLE
-                fabSurface.visibility     = if (isSdi) View.GONE else View.VISIBLE
-                fabAddDistress.visibility = if (isSdi) View.VISIBLE else View.GONE
-                fabCamera.visibility      = if (isSdi) View.GONE else View.VISIBLE
-                fabVoice.visibility       = if (isSdi) View.GONE else View.VISIBLE
+                // SDI dan PCI pakai distress input, GENERAL pakai condition/surface
+                val isSdiOrPci = mode == SurveyMode.SDI || mode == SurveyMode.PCI
+                fabCondition.visibility   = if (isSdiOrPci) View.GONE else View.VISIBLE
+                fabSurface.visibility     = if (isSdiOrPci) View.GONE else View.VISIBLE
+                fabAddDistress.visibility = if (isSdiOrPci) View.VISIBLE else View.GONE
+                fabCamera.visibility      = if (isSdiOrPci) View.GONE else View.VISIBLE
+                fabVoice.visibility       = if (isSdiOrPci) View.GONE else View.VISIBLE
             } else {
                 fabCondition.visibility   = View.GONE
                 fabSurface.visibility     = View.GONE
@@ -505,7 +524,7 @@ class MapFragment : Fragment() {
             }
             .launchIn(viewLifecycleOwner.lifecycleScope)
 
-        // Z-axis vibration guide: panduan kondisi real-time untuk surveyor
+        // Z-axis vibration guide
         combine(
             viewModel.vibration,
             viewModel.thresholdBaik,

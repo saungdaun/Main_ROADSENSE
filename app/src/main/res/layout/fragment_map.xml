@@ -64,7 +64,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Kecepatan"
-                    android:textSize="9sp"
+                    android:textSize="11sp"
                     android:textColor="#AAFFFFFF" />
             </LinearLayout>
 
@@ -95,7 +95,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Jarak Tempuh"
-                    android:textSize="9sp"
+                    android:textSize="11sp"
                     android:textColor="#AAFFFFFF" />
             </LinearLayout>
 
@@ -127,7 +127,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="ASPAL"
-                    android:textSize="10sp"
+                    android:textSize="11sp"
                     android:textColor="#AAFFFFFF"
                     tools:text="BETON" />
             </LinearLayout>
@@ -191,7 +191,7 @@
                     android:layout_margin="6dp"
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="3dp"
-                    android:textSize="10sp"
+                    android:textSize="11sp"
                     android:textStyle="bold"
                     android:textColor="#4CAF50"
                     android:background="@drawable/bg_chip_dark"

@@ -20,27 +20,31 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import zaujaani.roadsensebasic.util.Constants
 import java.io.IOException
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * BluetoothGateway v2 — ESP32 SPP Connection Manager
+ * BluetoothGateway v2.1 — ESP32 SPP Connection Manager
  *
- * Fitur baru:
- * - Auto-switch: saat connect → matikan SensorGateway internal
- * - Auto-fallback: saat disconnect → nyalakan kembali SensorGateway internal
- * - Auto-reconnect dengan exponential backoff
- * - Parsing data ESP32 format: RS2,<ts>,<pulse>,<accelZ>,<vBat>,<temp>
- * - Feed data ke SensorGateway.externalData (StateFlow baru)
+ * FIX v2.1 (Bug #4):
+ *   feedExternalAux(vBat, temp) sekarang dipanggil setelah parse data.
+ *   Sebelumnya ESP32 battery dan temperature tidak pernah masuk SensorGateway,
+ *   menyebabkan widget baterai selalu tampil 0V dan suhu 0°C.
+ *
+ * FIX v2.1 (minor):
+ *   Menggunakan Constants.ESP32_SPP_UUID alih-alih duplikasi di private object.
+ *   Menghapus Constants_BT private object yang redundan.
  */
 @Singleton
 class BluetoothGateway @Inject constructor(
     private val context: Context,
-    private val sensorGateway: SensorGateway  // inject untuk auto-switch
+    private val sensorGateway: SensorGateway
 ) {
-    private val sppUuid = UUID.fromString(Constants_BT.SPP_UUID)
+    // FIX: gunakan Constants.ESP32_SPP_UUID (tidak duplikasi lagi)
+    private val sppUuid = UUID.fromString(Constants.ESP32_SPP_UUID)
 
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
         val manager = context.getSystemService(BluetoothManager::class.java)
@@ -66,10 +70,10 @@ class BluetoothGateway @Inject constructor(
     data class Esp32Data(
         val timestamp: Long,
         val pulseCount: Long,
-        val accelZ: Float,      // g
+        val accelZ: Float,
         val batteryVoltage: Float,
         val temperature: Float,
-        val speedKmh: Float = 0f  // dihitung dari pulse + kalibrasi
+        val speedKmh: Float = 0f
     )
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
@@ -81,12 +85,10 @@ class BluetoothGateway @Inject constructor(
     private val _rawLine = MutableStateFlow("")
     val rawLine: StateFlow<String> = _rawLine.asStateFlow()
 
-    /** true jika data dari ESP32 digunakan sebagai sumber sensor utama */
     val isExternalSensorActive: Boolean
         get() = _connectionState.value is ConnectionState.Connected
 
-    // Kalibrasi (dari PreferencesManager atau UI kalibrasi)
-    var wheelCircumferenceMeter: Double = 1.885  // default: roda 60cm diameter
+    var wheelCircumferenceMeter: Double = 1.885
     var pulsesPerRevolution: Int = 20
 
     private fun hasBluetoothPermission(): Boolean {
@@ -138,7 +140,6 @@ class BluetoothGateway @Inject constructor(
                 reconnectAttempts = 0
                 Timber.i("BT Connected to ${device.name}")
 
-                // ── AUTO-SWITCH: matikan sensor internal, pakai ESP32 ──────
                 sensorGateway.setExternalSensorActive(true)
                 Timber.i("Internal sensor PAUSED — using ESP32")
 
@@ -175,7 +176,6 @@ class BluetoothGateway @Inject constructor(
                     val chunk = String(byteArray, 0, bytes)
                     buffer.append(chunk)
 
-                    // Parse complete lines ending with \n
                     var newlineIdx: Int
                     while (buffer.indexOf('\n').also { newlineIdx = it } >= 0) {
                         val line = buffer.substring(0, newlineIdx).trim()
@@ -201,23 +201,27 @@ class BluetoothGateway @Inject constructor(
             val parts = line.split(",")
             if (parts.size < 6) return
 
-            val ts = parts[1].toLongOrNull() ?: return
-            val pulse = parts[2].toLongOrNull() ?: return
+            val ts     = parts[1].toLongOrNull()  ?: return
+            val pulse  = parts[2].toLongOrNull()  ?: return
             val accelZ = parts[3].toFloatOrNull() ?: return
-            val vBat = parts[4].toFloatOrNull() ?: return
-            val temp = parts[5].toFloatOrNull() ?: return
+            val vBat   = parts[4].toFloatOrNull() ?: return
+            val temp   = parts[5].toFloatOrNull() ?: return
 
             val data = Esp32Data(
-                timestamp = ts,
-                pulseCount = pulse,
-                accelZ = accelZ,
+                timestamp      = ts,
+                pulseCount     = pulse,
+                accelZ         = accelZ,
                 batteryVoltage = vBat,
-                temperature = temp
+                temperature    = temp
             )
             _esp32Data.value = data
 
-            // Feed ke SensorGateway sebagai external data
+            // Feed vibration ke pipeline sensor
             sensorGateway.feedExternalVibration(accelZ)
+
+            // FIX #4: feed baterai & suhu (sebelumnya HILANG, selalu 0V dan 0°C)
+            sensorGateway.feedExternalAux(vBat, temp)
+
         } catch (e: Exception) {
             Timber.w("ESP32 parse error: $line")
         }
@@ -226,13 +230,12 @@ class BluetoothGateway @Inject constructor(
     private suspend fun handleDisconnect(address: String) {
         closeSafely()
 
-        // ── AUTO-FALLBACK: nyalakan kembali sensor internal ───────────────
         sensorGateway.setExternalSensorActive(false)
         Timber.i("ESP32 disconnected — internal sensor RESUMED")
 
         if (reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++
-            val delayMs = minOf(2000L * reconnectAttempts, 30000L) // max 30 detik
+            val delayMs = minOf(2000L * reconnectAttempts, 30000L)
             _connectionState.value = ConnectionState.Reconnecting(reconnectAttempts)
             Timber.i("Reconnecting in ${delayMs}ms (attempt $reconnectAttempts)")
             delay(delayMs)
@@ -244,7 +247,7 @@ class BluetoothGateway @Inject constructor(
     }
 
     fun disconnect() {
-        reconnectAttempts = maxReconnectAttempts // stop auto-reconnect
+        reconnectAttempts = maxReconnectAttempts
         readingJob?.cancel()
         reconnectJob?.cancel()
         gatewayScope.launch { closeSafely() }
@@ -262,10 +265,6 @@ class BluetoothGateway @Inject constructor(
         bluetoothSocket = null
     }
 
-    /**
-     * Kirim perintah ke ESP32.
-     * @param command "CMD:START", "CMD:STOP", "CMD:PAUSE"
-     */
     fun sendCommand(command: String) {
         gatewayScope.launch {
             try {
@@ -279,14 +278,8 @@ class BluetoothGateway @Inject constructor(
         }
     }
 
-    /** Kalkulasi jarak dari pulse count menggunakan kalibrasi */
     fun pulseToDistance(pulseCount: Long): Double {
         val revolutions = pulseCount.toDouble() / pulsesPerRevolution
         return revolutions * wheelCircumferenceMeter
     }
-}
-
-// Konstanta BT terpisah untuk menghindari circular dependency
-private object Constants_BT {
-    const val SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB"
 }

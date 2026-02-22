@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="detail_duration">
+        <item quantity="one">Durasi: %d menit</item>
+        <item quantity="other">Durasi: %d menit</item>
+    </plurals>
+</resources>

@@ -6,18 +6,6 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.Instant
 
-/**
- * TelemetryRaw — one GPS+sensor sample per location fix (~1 Hz).
- *
- * Every row captures the full environmental context at that moment:
- * speed, altitude, vibration (X/Y/Z RMS), GPS accuracy, cumulative distance,
- * and the current condition/surface label set by the surveyor.
- *
- * This table enables post-processing for:
- * - GPX/CSV export
- * - AI surface recognition input
- * - IRI (International Roughness Index) estimation
- */
 @Entity(
     tableName = "telemetry_raw",
     foreignKeys = [
@@ -41,22 +29,23 @@ data class TelemetryRaw(
     val sessionId: Long,
     val timestamp: Instant,
 
-    // ── GPS ──
+    // GPS
     val latitude: Double,
     val longitude: Double,
     val altitude: Double,
-    val speed: Float,          // m/s (harus >= 0)
-    val gpsAccuracy: Float,    // meter (1-sigma, harus >= 0)
+    val speed: Float,          // m/s
+    val gpsAccuracy: Float,    // meter
 
-    // ── Sensor (linear acceleration dalam satuan g, setelah gravity removal) ──
-    val vibrationX: Float,     // RMS sumbu X (atau raw jika tidak di-smoothing)
-    val vibrationY: Float,     // RMS sumbu Y
-    val vibrationZ: Float,     // RMS sumbu Z (primer untuk getaran jalan)
+    // Sensor
+    val vibrationX: Float,
+    val vibrationY: Float,
+    val vibrationZ: Float,
 
-    // ── Derived ──
+    // Derived
     val cumulativeDistance: Double,  // meter dari awal sesi
+    val confidence: Int,              // 0-100, kualitas data titik ini
 
-    // ── Context labels (diisi oleh surveyor saat pengambilan data) ──
+    // Context labels
     val condition: Condition,
     val surface: Surface
 )

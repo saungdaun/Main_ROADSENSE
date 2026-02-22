@@ -237,5 +237,20 @@
     <string name="photo_preview_title">Preview Foto</string>
     <string name="surveyor_name_hint">Masukkan Nama Surveyor</string>
     <string name="action_pause">Pause ⏸</string>
+    <!-- Untuk bottom sheet distress -->
+    <string name="distress_input_title">Input Kerusakan Jalan</string>
+
+    <string name="length_area_label">Panjang / Luas</string>
+
+    <string name="quick_5_preset">Preset 5</string>
+    <string name="quick_10_preset">Preset 10</string>
+    <string name="quick_20_preset">Preset 20</string>
+    <string name="quick_50_preset">Preset 50</string>
+    <string name="documentation_label">Dokumentasi</string>
+
+    <string name="save_distress">Simpan Kerusakan</string>
+    <string name="mode_pci">PCI</string>
+    <string name="lane_width_hint">Lebar lajur (meter)</string>
+    <string name="distress_mode_required">Mode SDI atau PCI diperlukan</string>
 
 </resources>

@@ -2,57 +2,117 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:padding="20dp">
 
-
+    <!-- Nama Surveyor -->
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="12dp"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusBottomEnd="12dp">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etSurveyorName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/surveyor_name_hint"
-            android:inputType="textPersonName" />
+            android:inputType="textPersonName"
+            android:textColor="?attr/colorOnSurface"
+            android:textColorHint="?attr/colorOnSurfaceVariant" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!-- Nama Ruas -->
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        android:layout_marginBottom="16dp"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusBottomEnd="12dp">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etRoadName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/road_name_hint"
-            android:inputType="text" />
+            android:inputType="text"
+            android:textColor="?attr/colorOnSurface"
+            android:textColorHint="?attr/colorOnSurfaceVariant" />
     </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- Mode Survey -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/select_mode"
+        android:textAppearance="?attr/textAppearanceTitleSmall"
+        android:textColor="?attr/colorOnSurface"
+        android:layout_marginBottom="8dp" />
+
     <RadioGroup
         android:id="@+id/radioGroupMode"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="8dp">
+        android:orientation="vertical"
+        android:layout_marginBottom="16dp">
 
         <RadioButton
             android:id="@+id/radioGeneral"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Umum"
-            android:checked="true" />
+            android:text="@string/mode_general"
+            android:checked="true"
+            android:textColor="?attr/colorOnSurface"
+            android:paddingVertical="8dp" />
 
         <RadioButton
             android:id="@+id/radioSdi"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="SDI" />
+            android:text="@string/mode_sdi"
+            android:textColor="?attr/colorOnSurface"
+            android:paddingVertical="8dp" />
+
+        <RadioButton
+            android:id="@+id/radioPci"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/mode_pci"
+            android:textColor="?attr/colorOnSurface"
+            android:paddingVertical="8dp" />
     </RadioGroup>
+
+    <!-- Input Lebar Lajur (khusus PCI) -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/layoutLaneWidth"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:visibility="gone"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:suffixText="m">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etLaneWidth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/lane_width_hint"
+            android:inputType="numberDecimal"
+            android:text="3.7"
+            android:textColor="?attr/colorOnSurface"
+            android:textColorHint="?attr/colorOnSurfaceVariant" />
+    </com.google.android.material.textfield.TextInputLayout>
 
 </LinearLayout>

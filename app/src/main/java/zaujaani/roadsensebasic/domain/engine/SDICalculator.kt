@@ -7,35 +7,39 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * SDICalculator v2 — Improved Surface Distress Index Calculation
+ * SDICalculator v3 — Surface Distress Index
  *
- * Perubahan dari v1:
- * 1. Formula lebih representatif — menggunakan deduct value berbasis extent
- * 2. Tidak throw IllegalArgumentException — gunakan default weight
- * 3. Mendukung lebih banyak jenis kerusakan (lihat DistressType)
- * 4. Penalti lebih besar untuk kombinasi kerusakan parah
- * 5. Output 0-100 di mana 0=sempurna, 100=rusak total
+ * Referensi: PD T-05-2005-B (Bina Marga) — SDI Classification Categories
+ * Formula: Modified Weighted Deduct Value (custom, terinspirasi dari metode Bina Marga)
  *
- * Referensi: PD T-05-2005-B (Bina Marga) — SDI Classification
+ * CATATAN METODOLOGI:
+ *   SDI standar Bina Marga (PD T-05-2005-B) menggunakan observasi visual lapangan
+ *   dengan penghitungan: luas retak (%), jumlah lubang, kedalaman alur, dan kondisi tepi.
+ *   RoadSense menggunakan pendekatan "Modified Weighted Deduct Value" yang dapat
+ *   dikalibrasi dengan data lapangan aktual oleh surveyor. Kategori SDI mengikuti
+ *   klasifikasi Bina Marga.
  *
- * Kategori SDI:
- *   0–20:  Baik Sekali   → tidak perlu penanganan
- *   21–40: Baik          → pemeliharaan rutin
- *   41–60: Sedang        → pemeliharaan berkala
- *   61–80: Rusak Ringan  → peningkatan/rehabilitasi
- *   81-100: Rusak Berat  → rekonstruksi
+ * Kategori SDI (PD T-05-2005-B):
+ *   0–20:   Baik Sekali  → tidak perlu penanganan
+ *   21–40:  Baik         → pemeliharaan rutin
+ *   41–60:  Sedang       → pemeliharaan berkala
+ *   61–80:  Rusak Ringan → peningkatan/rehabilitasi
+ *   81–100: Rusak Berat  → rekonstruksi
  *
- * Deduct Value Matrix (Extent × Severity):
- *   Extent = lengthOrArea / segmentLength (0-1)
- *   Setiap tipe kerusakan memiliki multiplier berbeda
+ * FIX v3 (Bug #5): maxExpected dinaikkan dari 180 menjadi 350.
+ *   Kalkulasi worst case:
+ *   - POTHOLE HIGH: 30 × 3.5 × 1.0 = 105
+ *   - RUTTING HIGH: 25 × 3.5 × 1.0 = 87.5
+ *   - DEPRESSION HIGH: 20 × 3.5 × 1.0 = 70
+ *   - CRACK HIGH: 15 × 3.5 × 1.0 = 52.5
+ *   Subtotal 4 tipe = 315, + penalty kombinasi ≈ 347. maxExpected=350 aman.
+ *
+ * Dengan maxExpected=180 (sebelumnya), jalan dengan 2 tipe berat sudah SDI=100,
+ * menghilangkan resolusi untuk kondisi sedang-berat. Sekarang diperbaiki.
  */
 @Singleton
 class SDICalculator @Inject constructor() {
 
-    /**
-     * Deduct Value per kerusakan = baseWeight × severityFactor × extent
-     * Kemudian total dikonversi ke skala SDI 0-100.
-     */
     private fun getBaseWeight(type: DistressType): Double = when (type) {
         DistressType.POTHOLE    -> 30.0  // Lubang: pengaruh terbesar ke SDI
         DistressType.RUTTING    -> 25.0  // Alur: bahaya aquaplaning
@@ -43,13 +47,13 @@ class SDICalculator @Inject constructor() {
         DistressType.SPALLING   -> 12.0  // Pengelupasan
         DistressType.RAVELING   -> 10.0  // Lepas agregat
         DistressType.DEPRESSION -> 20.0  // Ambles: bahaya dan bergenang
-        else                    -> 8.0   // Tipe lain default
+        else                    ->  8.0  // Tipe lain default
     }
 
     private fun getSeverityFactor(severity: Severity): Double = when (severity) {
         Severity.LOW    -> 1.0
         Severity.MEDIUM -> 2.0
-        Severity.HIGH   -> 3.5  // Parah tidak linear (bukan hanya 3x)
+        Severity.HIGH   -> 3.5   // Non-linear (kerusakan parah tidak sekadar 3×)
     }
 
     /**
@@ -68,50 +72,38 @@ class SDICalculator @Inject constructor() {
         var totalDeductValue = 0.0
 
         for (item in distressItems) {
-            val baseWeight = getBaseWeight(item.type)
+            val baseWeight     = getBaseWeight(item.type)
             val severityFactor = getSeverityFactor(item.severity)
-            val extent = (item.lengthOrArea / segmentLength).coerceIn(0.0, 1.0)
-
-            // Deduct value per item
-            val deductValue = baseWeight * severityFactor * extent
-            totalDeductValue += deductValue
+            val extent         = (item.lengthOrArea / segmentLength).coerceIn(0.0, 1.0)
+            totalDeductValue  += baseWeight * severityFactor * extent
         }
 
-        // Penalti kombinasi: jika banyak tipe berbeda, tambah penalti
+        // Penalti kombinasi: jika ada >2 tipe kerusakan berbeda, tambah penalti 10% per tipe
         val uniqueTypes = distressItems.map { it.type }.distinct().size
         if (uniqueTypes > 2) {
             totalDeductValue *= (1.0 + (uniqueTypes - 2) * 0.10)
         }
 
-        // Konversi ke skala 0-100
-        // Max theoretical deduct ≈ 180 (semua jenis, severity HIGH, extent 100%)
-        // Normalize ke 0-100, cap di 100
-        val maxExpected = 180.0
+        // FIX v3: maxExpected dinaikkan ke 350 (sebelumnya 180, terlalu kecil).
+        // Worst case dengan 4 tipe kerusakan HIGH extent=1.0: ~347
+        val maxExpected = 350.0
         val sdi = ((totalDeductValue / maxExpected) * 100).coerceIn(0.0, 100.0)
 
         return sdi.toInt()
     }
 
     /**
-     * Rata-rata SDI seluruh segmen dalam satu sesi.
-     * Weighted by equal segment lengths (100m each).
+     * Rata-rata SDI seluruh segmen dalam satu sesi (weighted equal per 100m segment).
      */
     fun calculateAverageSDI(scores: List<Int>): Int {
         if (scores.isEmpty()) return 0
         return scores.average().toInt()
     }
 
-    /**
-     * Validasi: apakah data cukup untuk SDI yang representatif?
-     * Minimum 1 distress item per 100m segment.
-     */
     fun isDataSufficient(distressItems: List<DistressItem>): Boolean {
         return distressItems.isNotEmpty()
     }
 
-    /**
-     * Pesan panduan untuk surveyor berdasarkan SDI score.
-     */
     fun getRecommendation(sdi: Int): String = when (sdi) {
         in 0..20  -> "Kondisi Baik Sekali — pemeliharaan rutin"
         in 21..40 -> "Kondisi Baik — pemeliharaan rutin"
