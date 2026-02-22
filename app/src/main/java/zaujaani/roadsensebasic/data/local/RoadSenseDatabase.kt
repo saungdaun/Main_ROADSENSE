@@ -19,10 +19,10 @@ import zaujaani.roadsensebasic.data.local.entity.*
         DistressItem::class,
         RoadSegment::class,
         PhotoAnalysisResult::class,
-        SegmentPci::class,          // ← BARU
-        PCIDistressItem::class      // ← BARU
+        SegmentPci::class,
+        PCIDistressItem::class
     ],
-    version = 9,                    // ← naik dari 8
+    version = 10,           // FIX #6: naik dari 9 → 10 (tambah kolom notes di distress_items)
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -35,15 +35,15 @@ abstract class RoadSenseDatabase : RoomDatabase() {
     abstract fun distressItemDao(): DistressItemDao
     abstract fun photoAnalysisDao(): PhotoAnalysisDao
     abstract fun segmentDao(): SegmentDao
-    abstract fun segmentPciDao(): SegmentPciDao         // ← BARU
-    abstract fun pciDistressItemDao(): PCIDistressItemDao // ← BARU
+    abstract fun segmentPciDao(): SegmentPciDao
+    abstract fun pciDistressItemDao(): PCIDistressItemDao
 
     companion object {
 
         @Volatile
         private var INSTANCE: RoadSenseDatabase? = null
 
-        // ── Migrasi lama — tidak diubah sama sekali ───────────────────────
+        // ── Migrasi lama — tidak diubah ───────────────────────────────────
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -158,7 +158,6 @@ abstract class RoadSenseDatabase : RoomDatabase() {
                 """)
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_photo_analysis_session ON photo_analysis(sessionId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_photo_analysis_status ON photo_analysis(status)")
-
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `road_segments` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -185,14 +184,9 @@ abstract class RoadSenseDatabase : RoomDatabase() {
             }
         }
 
-        // ── MIGRATION 8 → 9: PCI + kolom avgPci ──────────────────────────
         private val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
-
-                // 1. avgPci di survey_sessions (-1 = belum dihitung / bukan sesi PCI)
                 db.execSQL("ALTER TABLE survey_sessions ADD COLUMN avgPci INTEGER NOT NULL DEFAULT -1")
-
-                // 2. Tabel segment_pci (50m per segmen, ASTM D6433)
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `segment_pci` (
                         `id`                    INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -217,8 +211,6 @@ abstract class RoadSenseDatabase : RoomDatabase() {
                 """)
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_segment_pci_session ON segment_pci(sessionId)")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_segment_pci_unique ON segment_pci(sessionId, segmentIndex)")
-
-                // 3. Tabel pci_distress_items
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `pci_distress_items` (
                         `id`            INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -243,6 +235,15 @@ abstract class RoadSenseDatabase : RoomDatabase() {
             }
         }
 
+        // ── FIX #6: MIGRATION 9 → 10 — tambah kolom notes di distress_items ──
+        // Kolom ini sebelumnya ada di DistressViewModel.saveDistress() sebagai parameter,
+        // tapi tidak ada di schema entity → catatan surveyor hilang diam-diam.
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE distress_items ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getInstance(context: Context): RoadSenseDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -253,7 +254,7 @@ abstract class RoadSenseDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
                         MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-                        MIGRATION_7_8, MIGRATION_8_9               // ← baru
+                        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10  // ← baru
                     )
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()

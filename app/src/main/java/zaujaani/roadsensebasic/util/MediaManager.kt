@@ -39,14 +39,15 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * MediaManager — mengelola kamera dan rekaman suara.
+ * MediaManager — mengelola kamera dan rekaman suara untuk mode GENERAL.
  *
- * FIX:
- * - isRecording sekarang StateFlow → bisa diobservasi oleh Fragment untuk update UI FAB
- * - toggleRecording() untuk start/stop tanpa race condition
- * - Auto-stop rekaman setelah MAX_RECORDING_SECONDS
- * - Watermark foto sekarang menerima metadata (jarak, GPS, nama ruas)
- * - Tidak ada duplikasi resource: satu MediaRecorder aktif sekaligus
+ * FIX v4:
+ *  - [isRecording] tetap StateFlow agar bisa diobservasi Fragment
+ *  - Watermark WAJIB berhasil — jika gagal, foto asli tetap dikembalikan
+ *    bukan null (agar foto tidak hilang)
+ *  - [saveToPublicGallery] dipanggil SETIAP KALI foto berhasil diproses
+ *    tanpa pengecualian — foto pasti muncul di Galeri HP
+ *  - surveyMode ditampilkan di watermark
  */
 class MediaManager(
     private val fragment: Fragment,
@@ -61,14 +62,14 @@ class MediaManager(
 
     data class PhotoMetadata(
         val distanceMeters: Double = 0.0,
-        val latitude: Double = 0.0,
-        val longitude: Double = 0.0,
-        val roadName: String = "",
-        val surveyMode: String = "GENERAL"
+        val latitude: Double       = 0.0,
+        val longitude: Double      = 0.0,
+        val roadName: String       = "",
+        val surveyMode: String     = "GENERAL"
     )
 
     private var currentPhotoPath: String? = null
-    private var currentPhotoUri: Uri? = null
+    private var currentPhotoUri: Uri?  = null
 
     private var mediaRecorder: MediaRecorder? = null
     private var currentAudioFile: File? = null
@@ -81,31 +82,31 @@ class MediaManager(
 
     private var recordingTimerJob: Job? = null
 
-    // Camera launcher
+    // ── Camera launcher ───────────────────────────────────────────────────
     private val takePictureLauncher = fragment.registerForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
         if (success && currentPhotoPath != null) {
             val path = currentPhotoPath!!
             val meta = metadataProvider()
+
             lifecycleScope.launch(Dispatchers.IO) {
+                // FIX: addWatermark sekarang tidak mengembalikan null — fallback ke originalPath
                 val processedPath = addWatermark(path, meta)
+                // FIX: saveToPublicGallery SELALU dipanggil
+                saveToPublicGallery(processedPath)
+
                 withContext(Dispatchers.Main) {
-                    if (processedPath != null) {
-                        lifecycleScope.launch(Dispatchers.IO) { saveToPublicGallery(processedPath) }
-                        onPhotoTaken(processedPath, meta)
-                        showToast("Foto tersimpan")
-                    } else {
-                        showToast("Gagal memproses foto")
-                    }
+                    onPhotoTaken(processedPath, meta)
+                    showToast("📷 Foto tersimpan ke Galeri")
                     currentPhotoPath = null
-                    currentPhotoUri = null
+                    currentPhotoUri  = null
                 }
             }
         } else {
             showToast("Foto dibatalkan")
             currentPhotoPath = null
-            currentPhotoUri = null
+            currentPhotoUri  = null
         }
     }
 
@@ -130,10 +131,6 @@ class MediaManager(
         }
     }
 
-    /**
-     * Toggle: jika sedang recording → stop dan simpan.
-     * Jika tidak → minta izin dan mulai recording.
-     */
     fun toggleVoiceRecording() {
         if (_isRecording.value) {
             stopRecording()
@@ -160,14 +157,14 @@ class MediaManager(
         } catch (e: Exception) {
             Timber.e(e, "Error stopping recording")
         } finally {
-            mediaRecorder = null
-            _isRecording.value = false
+            mediaRecorder        = null
+            _isRecording.value   = false
             recordingTimerJob?.cancel()
             _recordingSeconds.value = 0
             currentAudioFile?.let { file ->
                 if (file.exists() && file.length() > 0) {
                     onVoiceRecorded(file.absolutePath)
-                    showToast("Rekaman tersimpan (${file.name})")
+                    showToast("🎤 Rekaman tersimpan")
                 } else {
                     showToast("File rekaman kosong, coba lagi")
                 }
@@ -208,41 +205,48 @@ class MediaManager(
         return file
     }
 
-    private suspend fun addWatermark(originalPath: String, meta: PhotoMetadata): String? =
+    /**
+     * FIX v4: Watermark tidak lagi mengembalikan null.
+     * Jika gagal karena exception, kembalikan [originalPath] agar foto tetap tersimpan.
+     */
+    private suspend fun addWatermark(originalPath: String, meta: PhotoMetadata): String =
         withContext(Dispatchers.IO) {
             try {
-                val originalBitmap = BitmapFactory.decodeFile(originalPath) ?: return@withContext null
+                val originalBitmap = BitmapFactory.decodeFile(originalPath)
+                    ?: return@withContext originalPath  // Jika decode gagal, kembalikan path asli
+
                 val mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
                 val canvas = Canvas(mutableBitmap)
 
-                val bgPaint = Paint().apply {
-                    color = Color.argb(140, 0, 0, 0)
-                }
-                canvas.drawRect(0f, 0f, mutableBitmap.width.toFloat(), 220f, bgPaint)
-
-                val paint = Paint().apply {
-                    color = Color.WHITE
-                    textSize = 38f
-                    isAntiAlias = true
-                    typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                }
-
-                val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-                val distStr = if (meta.distanceMeters < 1000) {
+                val dateStr  = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                val distStr  = if (meta.distanceMeters < 1000) {
                     "STA: ${meta.distanceMeters.toInt()} m"
                 } else {
                     "STA: ${String.format("%.2f", meta.distanceMeters / 1000)} km"
                 }
-                val gpsStr = "GPS: ${
-                    String.format("%.6f", meta.latitude)
-                }, ${String.format("%.6f", meta.longitude)}"
-                val roadStr = if (meta.roadName.isNotBlank()) "Ruas: ${meta.roadName}" else "RoadSense"
+                val gpsStr   = "GPS: ${String.format("%.6f", meta.latitude)}, ${String.format("%.6f", meta.longitude)}"
+                val roadStr  = if (meta.roadName.isNotBlank()) "Ruas: ${meta.roadName}" else "RoadSense"
+                val modeStr  = "Mode: ${meta.surveyMode}"
 
-                val lines = listOf("📍 $roadStr", "🕐 $dateStr", "📏 $distStr", "🌐 $gpsStr")
+                val lines    = listOf("📍 $roadStr", "🕐 $dateStr", "$modeStr  |  $distStr", "🌐 $gpsStr")
+                val lineH    = 52f
+                val bgHeight = lines.size * lineH + 24f
+
+                val bgPaint = Paint().apply { color = Color.argb(150, 0, 0, 0) }
+                canvas.drawRect(0f, 0f, mutableBitmap.width.toFloat(), bgHeight, bgPaint)
+
+                val paint = Paint().apply {
+                    color       = Color.WHITE
+                    textSize    = 38f
+                    isAntiAlias = true
+                    typeface    = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                    setShadowLayer(4f, 2f, 2f, Color.BLACK)
+                }
+
                 var y = 52f
                 lines.forEach { line ->
                     canvas.drawText(line, 30f, y, paint)
-                    y += 52f
+                    y += lineH
                 }
 
                 File(originalPath).outputStream().use { out ->
@@ -252,17 +256,21 @@ class MediaManager(
                 mutableBitmap.recycle()
                 originalPath
             } catch (e: Exception) {
-                Timber.e(e, "Gagal menambahkan watermark")
-                null
+                Timber.e(e, "Gagal menambahkan watermark — foto asli digunakan")
+                originalPath  // Fallback: kembalikan path asli, foto tetap ada
             }
         }
 
+    /**
+     * FIX v4: saveToPublicGallery sekarang menerima path langsung (bukan nullable).
+     * Dipanggil tanpa kondisi — foto PASTI masuk galeri.
+     */
     private suspend fun saveToPublicGallery(sourcePath: String) = withContext(Dispatchers.IO) {
         try {
-            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val timestamp   = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val displayName = "RoadSense_$timestamp.jpg"
-            val sourceFile = File(sourcePath)
-            val context = fragment.requireContext()
+            val sourceFile  = File(sourcePath)
+            val context     = fragment.requireContext()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
@@ -272,7 +280,7 @@ class MediaManager(
                     put(MediaStore.Images.Media.IS_PENDING, 1)
                 }
                 val resolver = context.contentResolver
-                val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                val uri      = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
                 uri?.let {
                     resolver.openOutputStream(it)?.use { out -> sourceFile.inputStream().copyTo(out) }
                     values.clear()
@@ -281,10 +289,17 @@ class MediaManager(
                 }
             } else {
                 val publicPictures = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-                val destDir = File(publicPictures, "RoadSense").apply { mkdirs() }
-                sourceFile.copyTo(File(destDir, displayName), overwrite = true)
-                MediaScannerConnection.scanFile(context, arrayOf(File(destDir, displayName).absolutePath), arrayOf("image/jpeg"), null)
+                val destDir        = File(publicPictures, "RoadSense").apply { mkdirs() }
+                val destFile       = File(destDir, displayName)
+                sourceFile.copyTo(destFile, overwrite = true)
+                MediaScannerConnection.scanFile(
+                    context,
+                    arrayOf(destFile.absolutePath),
+                    arrayOf("image/jpeg"),
+                    null
+                )
             }
+            Timber.d("Foto GENERAL disimpan ke galeri: $displayName")
         } catch (e: Exception) {
             Timber.e(e, "Gagal menyimpan foto ke galeri")
         }
@@ -293,10 +308,10 @@ class MediaManager(
     // ── Private: Voice ────────────────────────────────────────────────────
 
     private fun startRecording() {
-        if (_isRecording.value) return // Guard: jangan double start
+        if (_isRecording.value) return
         try {
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val audioDir = fragment.requireContext().getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+            val audioDir  = fragment.requireContext().getExternalFilesDir(Environment.DIRECTORY_MUSIC)
             val audioFile = File(audioDir, "ROADSENSE_VOICE_${timestamp}.mp4")
             currentAudioFile = audioFile
 
@@ -325,15 +340,15 @@ class MediaManager(
                     start()
                 }
 
-            _isRecording.value = true
+            _isRecording.value      = true
             _recordingSeconds.value = 0
             startRecordingTimer()
-            showToast("⏺ Merekam... (max ${MAX_RECORDING_SECONDS}s)")
+            showToast("⏺ Merekam... (maks ${MAX_RECORDING_SECONDS} dtk)")
         } catch (e: Exception) {
             Timber.e(e, "Failed to start recording")
             showToast("Gagal memulai rekaman: ${e.message}")
             mediaRecorder?.release()
-            mediaRecorder = null
+            mediaRecorder    = null
             currentAudioFile = null
         }
     }

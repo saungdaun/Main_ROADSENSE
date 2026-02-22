@@ -2,10 +2,11 @@
 <!--
     fragment_map.xml — Layout utama peta survey RoadSense
 
-    Elemen baru vs versi sebelumnya:
-    - tvVibrationGuide : chip panduan getaran real-time untuk surveyor
-    - bg_chip_dark     : drawable chip semi-transparan (buat di res/drawable)
-    - bg_status_bar    : drawable gradient gelap di atas (buat di res/drawable)
+    Perubahan vs versi sebelumnya (dari dokumen yang diberikan):
+    ✅ tvSegmentBadge  : ditambahkan di dalam LinearLayout status bar atas,
+                         di bawah row Speed|Jarak|Kondisi.
+                         Menampilkan "Segmen #N — SDI/PCI" saat mode aktif.
+                         Default visibility="gone", dikendalikan Fragment.
 -->
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -23,7 +24,8 @@
 
     <!-- ═══════════════════════════════════════════════
          STATUS BAR ATAS
-         Speed | Jarak | Kondisi & Permukaan
+         Speed | Jarak | Kondisi &amp; Permukaan
+         + tvSegmentBadge (SDI/PCI mode)
          ═══════════════════════════════════════════════ -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -36,6 +38,7 @@
         android:paddingHorizontal="8dp"
         android:elevation="6dp">
 
+        <!-- Row Speed | Jarak | Kondisi -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -104,7 +107,7 @@
                 android:layout_height="30dp"
                 android:background="#55FFFFFF" />
 
-            <!-- Kondisi & Permukaan (General) / SDI label (SDI) -->
+            <!-- Kondisi &amp; Permukaan (General) / SDI label (SDI) -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -133,6 +136,36 @@
             </LinearLayout>
 
         </LinearLayout>
+
+        <!--
+            tvSegmentBadge — badge nomor segmen aktif (SDI / PCI mode)
+            ============================================================
+            Tampil di bawah row Speed|Jarak|Kondisi hanya saat survey
+            mode SDI atau PCI sedang berjalan.
+
+            Format teks: "Segmen #3 — SDI"  atau  "Segmen #7 — PCI"
+            Diisi dan dikendalikan dari MapFragment.observeDistanceTrigger().
+
+            Tidak tampil (visibility=gone) saat:
+              • Mode GENERAL
+              • Survey belum dimulai / sudah selesai
+        -->
+        <TextView
+            android:id="@+id/tvSegmentBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="6dp"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="4dp"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/bg_chip_dark"
+            android:visibility="gone"
+            tools:visibility="visible"
+            tools:text="Segmen #3 — SDI" />
+
     </LinearLayout>
 
     <!-- ═══════════════════════════════════════════════
@@ -266,7 +299,7 @@
             app:backgroundTint="@color/primary"
             app:tint="@color/white" />
 
-        <!-- Kamera / Foto dokumentasi (hanya mode GENERAL) -->
+        <!-- Kamera (semua mode saat survey aktif) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabCamera"
             android:layout_width="wrap_content"
@@ -279,7 +312,7 @@
             app:backgroundTint="@color/primary"
             app:tint="@color/white" />
 
-        <!-- Voice / Rekam suara (hanya mode GENERAL, toggle start/stop) -->
+        <!-- Voice / Rekam suara (semua mode saat survey aktif, toggle start/stop) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabVoice"
             android:layout_width="wrap_content"
@@ -292,13 +325,16 @@
             app:backgroundTint="@color/primary"
             app:tint="@color/white" />
 
-        <!-- Tambah Distress (hanya mode SDI) -->
+        <!-- Tambah Distress:
+             SDI → DistressBottomSheet
+             PCI → PciDistressBottomSheet
+             Visibility diatur di Fragment -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabAddDistress"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            android:contentDescription="Input distress SDI"
+            android:contentDescription="Input distress SDI / PCI"
             android:visibility="gone"
             app:fabSize="mini"
             app:srcCompat="@drawable/ic_add_distress"

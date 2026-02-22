@@ -32,6 +32,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * SummaryFragment — Menampilkan daftar sesi survei dan detail per sesi.
+ *
+ * ATURAN FOTO PER MODE (FIX #2):
+ *   - GENERAL : foto DITAMPILKAN di dialog detail (EventType.PHOTO)
+ *   - SDI     : foto TIDAK ditampilkan di dialog detail laporan
+ *               (foto disimpan di galeri & tersedia di DistressItem, tapi
+ *                tidak dimunculkan di ringkasan karena bukan standar pelaporan SDI)
+ *   - PCI     : foto TIDAK ditampilkan di dialog detail laporan
+ *               (sama dengan SDI — foto dokumentasi tersimpan di galeri HP)
+ */
 @AndroidEntryPoint
 class SummaryFragment : Fragment() {
 
@@ -58,9 +69,6 @@ class SummaryFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        // SessionAdapter menerima SessionWithCount (bukan SurveySession langsung)
-        // onItemClick  → tap row  → buka detail
-        // onDetailClick → tap btnViewDetails → buka session options
         val adapter = SessionAdapter(
             onItemClick   = { item -> showSessionDetail(item.session.id) },
             onDetailClick = { item -> showSessionOptions(item.session) }
@@ -82,11 +90,9 @@ class SummaryFragment : Fragment() {
 
         viewModel.sessionDetail.observe(viewLifecycleOwner) { detail ->
             detail ?: return@observe
-
-            // FIX #1 KRITIS: PCI mode tidak punya dialog sendiri (Bug #1)
             when (detail.mode) {
                 SurveyMode.SDI     -> showSdiDetailDialog(detail)
-                SurveyMode.PCI     -> showPciDetailDialog(detail)     // ← sebelumnya HILANG
+                SurveyMode.PCI     -> showPciDetailDialog(detail)
                 SurveyMode.GENERAL -> showGeneralDetailDialog(detail)
             }
         }
@@ -96,7 +102,9 @@ class SummaryFragment : Fragment() {
         viewModel.loadSessionDetail(sessionId)
     }
 
-    // ── GENERAL MODE DIALOG ───────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    // GENERAL MODE DIALOG — foto DITAMPILKAN
+    // ══════════════════════════════════════════════════════════════════════
 
     private fun showGeneralDetailDialog(detail: SessionDetailUi) {
         val sb = StringBuilder()
@@ -111,8 +119,7 @@ class SummaryFragment : Fragment() {
             sb.appendLine("🛣 ${detail.session.roadName}")
         }
 
-        val totalDistText = formatDistance(detail.totalDistance)
-        sb.appendLine(getString(R.string.detail_total_distance, totalDistText))
+        sb.appendLine(getString(R.string.detail_total_distance, formatDistance(detail.totalDistance)))
         sb.appendLine(getString(R.string.detail_duration, detail.durationMinutes))
         sb.appendLine(getString(R.string.detail_avg_confidence, detail.avgConfidence))
         sb.appendLine(getString(R.string.detail_photos, detail.photoCount))
@@ -158,12 +165,13 @@ class SummaryFragment : Fragment() {
             }
         }
 
+        // FIX: Foto hanya untuk GENERAL mode
         val photos = detail.events.filter { it.eventType == EventType.PHOTO && it.value.isNotBlank() }
 
         val builder = MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.detail_title) + " (Umum)")
             .setMessage(sb.toString())
-            .setPositiveButton(getString(R.string.export_gpx)) { _, _ -> exportSession(detail.session, "gpx") }
+            .setPositiveButton(getString(R.string.export_pdf)) { _, _ -> exportSession(detail.session, "pdf") }
             .setNeutralButton(getString(R.string.export_csv)) { _, _ -> exportSession(detail.session, "csv") }
 
         if (photos.isNotEmpty()) {
@@ -177,57 +185,58 @@ class SummaryFragment : Fragment() {
         builder.show()
     }
 
-    // ── SDI MODE DIALOG ───────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    // SDI MODE DIALOG — foto TIDAK ditampilkan (FIX #2)
+    // ══════════════════════════════════════════════════════════════════════
 
     private fun showSdiDetailDialog(detail: SessionDetailUi) {
-        val dialogView     = layoutInflater.inflate(R.layout.dialog_sdi_detail, null)
-        val tvAvgSdi       = dialogView.findViewById<TextView>(R.id.tvAvgSdi)
-        val progressBar    = dialogView.findViewById<View>(R.id.progressBar)
+        val dialogView      = layoutInflater.inflate(R.layout.dialog_sdi_detail, null)
+        val tvAvgSdi        = dialogView.findViewById<TextView>(R.id.tvAvgSdi)
+        val progressBar     = dialogView.findViewById<View>(R.id.progressBar)
         val tvTotalDistance = dialogView.findViewById<TextView>(R.id.tvTotalDistance)
         val tvTotalSegments = dialogView.findViewById<TextView>(R.id.tvTotalSegments)
         val tvTotalDistress = dialogView.findViewById<TextView>(R.id.tvTotalDistress)
-        val recyclerView   = dialogView.findViewById<RecyclerView>(R.id.recyclerViewSegments)
+        val recyclerView    = dialogView.findViewById<RecyclerView>(R.id.recyclerViewSegments)
 
-        tvAvgSdi.text = getString(R.string.sdi_average, detail.averageSdi, SDICalculator.categorizeSDI(detail.averageSdi))
+        tvAvgSdi.text = getString(
+            R.string.sdi_average,
+            detail.averageSdi,
+            SDICalculator.categorizeSDI(detail.averageSdi)
+        )
         progressBar.setBackgroundColor(getSdiColor(detail.averageSdi))
-
         tvTotalDistance.text = "Total Panjang: ${formatDistance(detail.totalDistance)}"
         tvTotalSegments.text = "Total Segmen: ${detail.segmentsSdi.size}"
         tvTotalDistress.text = "Total Kerusakan: ${detail.distressItems.size}"
 
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         val adapter = SegmentSdiAdapter { segment ->
-            showSegmentDetail(segment, detail.distressItems.filter { it.segmentId == segment.id })
+            showSdiSegmentDetail(
+                segment,
+                detail.distressItems.filter { it.segmentId == segment.id }
+            )
         }
         recyclerView.adapter = adapter
         adapter.submitList(detail.segmentsSdi)
 
-        val allPhotoItems = detail.distressItems.filter { it.photoPath.isNotBlank() }
-
-        val builder = MaterialAlertDialogBuilder(requireContext())
+        // FIX #2: SDI — TIDAK ada tombol lihat foto di laporan summary
+        // Foto tetap tersimpan di galeri HP melalui DistressBottomSheet
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.detail_title) + " (SDI)")
             .setView(dialogView)
-            .setPositiveButton(getString(R.string.export_gpx)) { _, _ -> exportSession(detail.session, "gpx") }
+            .setPositiveButton(getString(R.string.export_pdf)) { _, _ -> exportSession(detail.session, "pdf") }
             .setNeutralButton(getString(R.string.export_csv)) { _, _ -> exportSession(detail.session, "csv") }
-
-        if (allPhotoItems.isNotEmpty()) {
-            builder.setNegativeButton("Lihat Semua Foto (${allPhotoItems.size})") { _, _ ->
-                showDistressPhotoSlider(allPhotoItems, 0)
-            }
-        } else {
-            builder.setNegativeButton(getString(R.string.close), null)
-        }
-
-        builder.show()
+            .setNegativeButton(getString(R.string.close), null)   // ← Tidak ada foto
+            .show()
     }
 
-    // ── PCI MODE DIALOG — FIX #1 (sebelumnya HILANG sama sekali) ─────────
+    // ══════════════════════════════════════════════════════════════════════
+    // PCI MODE DIALOG — foto TIDAK ditampilkan (FIX #2)
+    // ══════════════════════════════════════════════════════════════════════
 
     private fun showPciDetailDialog(detail: SessionDetailUi) {
         val sb = StringBuilder()
         val dateFormat = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault())
 
-        // Header
         sb.appendLine("═══════════════════════════════")
         sb.appendLine("    LAPORAN SURVEI PCI")
         sb.appendLine("    ASTM D6433")
@@ -260,7 +269,7 @@ class SummaryFragment : Fragment() {
             sb.appendLine("│  Tindakan: ${rating.actionRequired}")
             sb.appendLine("└─────────────────────────────┘")
         } else {
-            sb.appendLine("⚠️ Belum ada data PCI tersedia (tidak ada input distress).")
+            sb.appendLine("⚠️ Belum ada data PCI (tidak ada input distress).")
         }
         sb.appendLine()
 
@@ -284,9 +293,9 @@ class SummaryFragment : Fragment() {
             sb.appendLine("  STA          PCI  Kondisi    Kerusakan")
             sb.appendLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             detail.segmentsPci.forEach { seg ->
-                val r = if (seg.pciScore >= 0) PCIRating.fromScore(seg.pciScore) else null
+                val r        = if (seg.pciScore >= 0) PCIRating.fromScore(seg.pciScore) else null
                 val pciStr   = if (seg.pciScore >= 0) "${seg.pciScore}" else " – "
-                val ratingStr = r?.displayName?.take(11)?.padEnd(11) ?: "Belum  disurvey"
+                val ratingStr = r?.displayName?.take(11)?.padEnd(11) ?: "Belum disurvey"
                 val distCount = "${seg.distressCount}".padStart(2)
                 sb.appendLine("  ${seg.startSta}–${seg.endSta}  $pciStr   $ratingStr  $distCount item")
                 if (seg.dominantDistressType.isNotBlank()) {
@@ -324,9 +333,8 @@ class SummaryFragment : Fragment() {
             sb.appendLine("Input data distress diperlukan untuk rekomendasi.")
         }
 
-        // Photo items dari PCI distress
-        val pciPhotoItems = detail.pciDistressItems.filter { it.photoPath.isNotBlank() }
-
+        // FIX #2: PCI — TIDAK ada tombol lihat foto di laporan summary
+        // Foto dokumentasi tersimpan di galeri HP melalui PciDistressBottomSheet
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Detail Survey PCI")
             .setMessage(sb.toString())
@@ -336,19 +344,15 @@ class SummaryFragment : Fragment() {
             .setNeutralButton(getString(R.string.export_csv)) { _, _ ->
                 exportSession(detail.session, "csv")
             }
-            .setNegativeButton(
-                if (pciPhotoItems.isNotEmpty()) "Lihat Foto (${pciPhotoItems.size})" else getString(R.string.close)
-            ) { _, _ ->
-                if (pciPhotoItems.isNotEmpty()) {
-                    showPciPhotoSlider(pciPhotoItems, 0)
-                }
-            }
+            .setNegativeButton(getString(R.string.close), null)   // ← Tidak ada foto
             .show()
     }
 
-    // ── SEGMENT DETAIL (SDI) ──────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    // SDI SEGMENT DETAIL
+    // ══════════════════════════════════════════════════════════════════════
 
-    private fun showSegmentDetail(
+    private fun showSdiSegmentDetail(
         segment: zaujaani.roadsensebasic.data.local.entity.SegmentSdi,
         distressItems: List<zaujaani.roadsensebasic.data.local.entity.DistressItem>
     ) {
@@ -362,116 +366,29 @@ class SummaryFragment : Fragment() {
             distressItems.forEachIndexed { i, item ->
                 sb.appendLine("${i+1}. ${item.type.name} – ${item.severity.name}")
                 sb.appendLine("   ${item.lengthOrArea} m/m², STA ${item.sta}")
-                if (item.photoPath.isNotBlank()) sb.appendLine("   📷 Foto tersedia")
+                // Informasikan bahwa foto tersimpan di galeri, bukan tampilkan di sini
+                if (item.photoPath.isNotBlank()) sb.appendLine("   📷 Foto tersimpan di Galeri HP")
                 if (item.audioPath.isNotBlank()) sb.appendLine("   🎤 Rekaman tersedia")
             }
         } else {
             sb.appendLine("Tidak ada kerusakan.")
         }
 
-        val photoItems = distressItems.filter { it.photoPath.isNotBlank() }
-        val builder = MaterialAlertDialogBuilder(requireContext())
+        // FIX #2: Detail segmen SDI — tidak ada tombol lihat foto
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle("Detail Segmen")
             .setMessage(sb.toString())
             .setPositiveButton("OK", null)
-        if (photoItems.isNotEmpty()) {
-            builder.setNeutralButton("Lihat Foto (${photoItems.size})") { _, _ ->
-                showDistressPhotoSlider(photoItems, 0)
-            }
-        }
-        builder.show()
-    }
-
-    // ── PHOTO SLIDERS ─────────────────────────────────────────────────────
-
-    /**
-     * Photo slider untuk DistressItem (SDI mode).
-     * FIX #3 OOM: gunakan BitmapFactory.Options dengan inSampleSize
-     */
-    private fun showDistressPhotoSlider(
-        photos: List<zaujaani.roadsensebasic.data.local.entity.DistressItem>,
-        startIndex: Int
-    ) {
-        val dialogView = layoutInflater.inflate(R.layout.dialog_photo_slider, null)
-        val imageView  = dialogView.findViewById<ImageView>(R.id.ivPhoto)
-        val tvCounter  = dialogView.findViewById<TextView>(R.id.tvCounter)
-        val btnPrev    = dialogView.findViewById<MaterialButton>(R.id.btnPrev)
-        val btnNext    = dialogView.findViewById<MaterialButton>(R.id.btnNext)
-
-        var currentIndex = startIndex
-
-        fun loadPhoto(index: Int) {
-            val item = photos[index]
-            val file = File(item.photoPath)
-            if (file.exists()) {
-                // FIX #3: decode dengan inSampleSize=4 untuk hindari OOM
-                val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
-                val bitmap = BitmapFactory.decodeFile(item.photoPath, opts)
-                imageView.setImageBitmap(bitmap)
-                tvCounter.text = "${index + 1}/${photos.size} - STA ${item.sta}"
-            } else {
-                Toast.makeText(requireContext(), "File foto tidak ditemukan", Toast.LENGTH_SHORT).show()
-            }
-            btnPrev.isEnabled = index > 0
-            btnNext.isEnabled = index < photos.size - 1
-        }
-
-        btnPrev.setOnClickListener { if (currentIndex > 0) { currentIndex--; loadPhoto(currentIndex) } }
-        btnNext.setOnClickListener { if (currentIndex < photos.size - 1) { currentIndex++; loadPhoto(currentIndex) } }
-
-        loadPhoto(currentIndex)
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(getString(R.string.photo_preview_title))
-            .setView(dialogView)
-            .setPositiveButton(getString(R.string.close), null)
             .show()
     }
 
-    /**
-     * Photo slider untuk PCIDistressItem.
-     */
-    private fun showPciPhotoSlider(
-        photos: List<zaujaani.roadsensebasic.data.local.entity.PCIDistressItem>,
-        startIndex: Int
-    ) {
-        val dialogView = layoutInflater.inflate(R.layout.dialog_photo_slider, null)
-        val imageView  = dialogView.findViewById<ImageView>(R.id.ivPhoto)
-        val tvCounter  = dialogView.findViewById<TextView>(R.id.tvCounter)
-        val btnPrev    = dialogView.findViewById<MaterialButton>(R.id.btnPrev)
-        val btnNext    = dialogView.findViewById<MaterialButton>(R.id.btnNext)
-
-        var currentIndex = startIndex
-
-        fun loadPhoto(index: Int) {
-            val item = photos[index]
-            val file = File(item.photoPath)
-            if (file.exists()) {
-                val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
-                val bitmap = BitmapFactory.decodeFile(item.photoPath, opts)
-                imageView.setImageBitmap(bitmap)
-                tvCounter.text = "${index + 1}/${photos.size} - ${item.type.displayName} | STA ${item.sta}"
-            } else {
-                Toast.makeText(requireContext(), "File foto tidak ditemukan", Toast.LENGTH_SHORT).show()
-            }
-            btnPrev.isEnabled = index > 0
-            btnNext.isEnabled = index < photos.size - 1
-        }
-
-        btnPrev.setOnClickListener { if (currentIndex > 0) { currentIndex--; loadPhoto(currentIndex) } }
-        btnNext.setOnClickListener { if (currentIndex < photos.size - 1) { currentIndex++; loadPhoto(currentIndex) } }
-
-        loadPhoto(currentIndex)
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Foto Kerusakan PCI")
-            .setView(dialogView)
-            .setPositiveButton(getString(R.string.close), null)
-            .show()
-    }
+    // ══════════════════════════════════════════════════════════════════════
+    // PHOTO SLIDER — HANYA UNTUK GENERAL MODE
+    // ══════════════════════════════════════════════════════════════════════
 
     /**
      * Photo slider untuk RoadEvent (GENERAL mode).
+     * FIX #3 OOM: gunakan BitmapFactory.Options dengan inSampleSize
      */
     private fun showPhotoSlider(
         photos: List<zaujaani.roadsensebasic.data.local.entity.RoadEvent>,
@@ -512,7 +429,9 @@ class SummaryFragment : Fragment() {
             .show()
     }
 
-    // ── SESSION OPTIONS & EXPORT ──────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    // SESSION OPTIONS & EXPORT
+    // ══════════════════════════════════════════════════════════════════════
 
     private fun showSessionOptions(session: SurveySession) {
         val items = arrayOf(
@@ -570,7 +489,9 @@ class SummaryFragment : Fragment() {
             .show()
     }
 
-    // ── HELPERS ───────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    // HELPERS
+    // ══════════════════════════════════════════════════════════════════════
 
     private fun formatDistance(meters: Double): String {
         return if (meters < 1000) {
@@ -587,7 +508,7 @@ class SummaryFragment : Fragment() {
     private fun formatStaFromMeters(meters: Int): String {
         val km = meters / 1000
         val m  = meters % 1000
-        return "STA %d+%03d".format(km, m)   // FIX: /1000 dan %1000, bukan /100 dan %100
+        return "STA %d+%03d".format(km, m)
     }
 
     private fun getSdiColor(sdi: Int): Int = when (sdi) {

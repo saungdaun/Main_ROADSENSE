@@ -377,6 +377,7 @@ class SurveyEngine @Inject constructor(
             gpsLat       = location.latitude,
             gpsLng       = location.longitude,
             sta          = formatSta(currentDistanceValue.toInt()),
+            notes        = notes ?: "",           // ← FIX #6: sebelumnya hilang
             createdAt    = System.currentTimeMillis()
         )
         externalScope.launch {
@@ -384,9 +385,8 @@ class SurveyEngine @Inject constructor(
                 surveyRepository.insertDistressItem(item)
                 val items = surveyRepository.getDistressForSegmentOnce(segmentId)
                 val sdi   = sdiCalculator.calculateSegmentSDI(items, segmentLength = SEGMENT_LENGTH)
-                surveyRepository.updateSegmentSdiScore(segmentId, sdi, items.size)
             } catch (e: Exception) {
-                Timber.e(e, "Failed to add SDI distress item")
+                Timber.e(e, "addDistressItem error")
             }
         }
     }

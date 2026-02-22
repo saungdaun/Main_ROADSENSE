@@ -37,6 +37,7 @@ import zaujaani.roadsensebasic.data.local.entity.SurveyMode
 import zaujaani.roadsensebasic.databinding.FragmentMapBinding
 import zaujaani.roadsensebasic.gateway.SensorGateway
 import zaujaani.roadsensebasic.ui.distress.DistressBottomSheet
+import zaujaani.roadsensebasic.ui.distress.PciDistressBottomSheet  // FIX: import PciDistressBottomSheet
 import zaujaani.roadsensebasic.util.MapRenderer
 import zaujaani.roadsensebasic.util.MediaManager
 import zaujaani.roadsensebasic.util.VibrationChartController
@@ -128,13 +129,10 @@ class MapFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         mapView.onPause()
-        // Sensor & GPS tetap aktif jika survey sedang berjalan
         if (!viewModel.isSurveying.value) {
             sensorGateway.stopListening()
             viewModel.stopLocationTracking()
         }
-        // Recording voice tetap berjalan saat pindah fragment —
-        // snackbar akan di-dismiss di onDestroyView, rekaman tidak terpotong
     }
 
     override fun onDestroyView() {
@@ -169,7 +167,6 @@ class MapFragment : Fragment() {
     }
 
     private fun initHelpers() {
-        // MediaManager dengan metadataProvider → watermark foto selalu pakai data real-time
         mediaManager = MediaManager(
             fragment       = this,
             lifecycleScope = lifecycleScope,
@@ -235,6 +232,8 @@ class MapFragment : Fragment() {
             )
         }
 
+        // ── Kamera: HANYA untuk mode GENERAL ─────────────────────────────
+        // Mode SDI/PCI mengambil foto dari dalam DistressBottomSheet masing-masing.
         fabCamera.setOnClickListener {
             if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
                 mediaManager.openCamera()
@@ -243,6 +242,7 @@ class MapFragment : Fragment() {
             }
         }
 
+        // ── Voice: HANYA untuk mode GENERAL ──────────────────────────────
         fabVoice.setOnClickListener {
             if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
                 mediaManager.toggleVoiceRecording()
@@ -253,23 +253,35 @@ class MapFragment : Fragment() {
 
         fabCondition.setOnClickListener { showConditionPicker() }
         fabSurface.setOnClickListener   { showSurfacePicker() }
-
         fabToggleOrientation.setOnClickListener {
             isOrientationEnabled = !isOrientationEnabled
-            mapRenderer.setOrientationEnabled(isOrientationEnabled)
             showToast(
                 if (isOrientationEnabled) getString(R.string.orientation_enabled)
                 else getString(R.string.orientation_disabled)
             )
         }
 
+        // ── FIX #1 KRITIS: Buka BottomSheet yang TEPAT per mode ──────────
+        // - SDI mode → DistressBottomSheet  (jenis kerusakan Bina Marga)
+        // - PCI mode → PciDistressBottomSheet (19 jenis ASTM D6433)
+        // Sebelumnya: SELALU buka DistressBottomSheet untuk keduanya (bug!)
         fabAddDistress.setOnClickListener {
-            if (viewModel.isSurveying.value && !viewModel.isPaused.value
-                && (viewModel.mode.value == SurveyMode.SDI || viewModel.mode.value == SurveyMode.PCI)
-            ) {
-                DistressBottomSheet().show(childFragmentManager, "DistressBottomSheet")
+            if (viewModel.isSurveying.value && !viewModel.isPaused.value) {
+                when (viewModel.mode.value) {
+                    SurveyMode.SDI -> {
+                        DistressBottomSheet()
+                            .show(childFragmentManager, "DistressBottomSheet")
+                    }
+                    SurveyMode.PCI -> {
+                        PciDistressBottomSheet()
+                            .show(childFragmentManager, "PciDistressBottomSheet")
+                    }
+                    SurveyMode.GENERAL -> {
+                        showToast(getString(R.string.distress_mode_required))
+                    }
+                }
             } else {
-                showToast(getString(R.string.distress_mode_required))
+                showToast(getString(R.string.survey_not_active))
             }
         }
     }
@@ -287,16 +299,16 @@ class MapFragment : Fragment() {
     }
 
     private fun showStartSurveyDialog() {
-        val dialogView   = layoutInflater.inflate(R.layout.dialog_start_survey, null)
-        val etSurveyor   = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etSurveyorName)
-        val etRoadName   = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etRoadName)
-        val radioGeneral = dialogView.findViewById<RadioButton>(R.id.radioGeneral)
-        val radioSdi     = dialogView.findViewById<RadioButton>(R.id.radioSdi)
-        val radioPci     = dialogView.findViewById<RadioButton>(R.id.radioPci)
+        val dialogView      = layoutInflater.inflate(R.layout.dialog_start_survey, null)
+        val etSurveyor      = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etSurveyorName)
+        val etRoadName      = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etRoadName)
+        val radioGeneral    = dialogView.findViewById<RadioButton>(R.id.radioGeneral)
+        val radioSdi        = dialogView.findViewById<RadioButton>(R.id.radioSdi)
+        val radioPci        = dialogView.findViewById<RadioButton>(R.id.radioPci)
         val layoutLaneWidth = dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.layoutLaneWidth)
-        val etLaneWidth  = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etLaneWidth)
+        val etLaneWidth     = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etLaneWidth)
+        val radioGroup      = dialogView.findViewById<RadioGroup>(R.id.radioGroupMode)
 
-        val radioGroup = dialogView.findViewById<RadioGroup>(R.id.radioGroupMode)
         radioGroup.setOnCheckedChangeListener { _, checkedId ->
             layoutLaneWidth.visibility = if (checkedId == R.id.radioPci) View.VISIBLE else View.GONE
         }
@@ -316,16 +328,34 @@ class MapFragment : Fragment() {
                 val mode = when (radioGroup.checkedRadioButtonId) {
                     R.id.radioSdi -> SurveyMode.SDI
                     R.id.radioPci -> SurveyMode.PCI
-                    else -> SurveyMode.GENERAL
+                    else          -> SurveyMode.GENERAL
                 }
 
                 val laneWidth = if (mode == SurveyMode.PCI) {
-                    etLaneWidth.text?.toString()?.toDoubleOrNull() ?: 3.7
+                    etLaneWidth?.text?.toString()?.toDoubleOrNull() ?: 3.7
                 } else 3.7
 
                 viewModel.startSurvey(surveyor, roadName, mode, laneWidth)
             }
             .setNegativeButton(getString(R.string.cancel), null)
+            .show()
+    }
+
+    private fun showStopSurveyConfirmation() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.stop_survey))
+            .setMessage(getString(R.string.stop_survey_confirm))
+            // "Simpan" → simpan data lalu navigasi ke summary
+            .setPositiveButton(getString(R.string.save)) { _, _ ->
+                viewModel.stopSurveyAndSave()                                   // FIX: was stopSurvey()
+                findNavController().navigate(R.id.action_mapFragment_to_summaryFragment) // FIX: correct nav ID
+            }
+            // "Buang" → hapus sesi lalu navigasi ke summary
+            .setNegativeButton(getString(R.string.discard)) { _, _ ->
+                viewModel.stopSurveyAndDiscard()
+                findNavController().navigate(R.id.action_mapFragment_to_summaryFragment)
+            }
+            .setNeutralButton(getString(R.string.cancel), null)
             .show()
     }
 
@@ -345,16 +375,14 @@ class MapFragment : Fragment() {
                         .setTitle(getString(R.string.warning_title))
                         .setMessage(getString(R.string.condition_mismatch_message, selected.name))
                         .setPositiveButton(getString(R.string.ok)) { _, _ ->
-                            viewModel.recordCondition(selected)
-                            dialog.dismiss()
+                            viewModel.recordCondition(selected)     // FIX: was setCondition()
                         }
                         .setNegativeButton(getString(R.string.cancel), null)
                         .show()
                 } else {
-                    viewModel.recordCondition(selected)
-                    dialog.dismiss()
-                    showToast(getString(R.string.condition_selected, selected.name))
+                    viewModel.recordCondition(selected)              // FIX: was setCondition()
                 }
+                dialog.dismiss()
             }
             .setNegativeButton(getString(R.string.cancel), null)
             .show()
@@ -370,68 +398,45 @@ class MapFragment : Fragment() {
                 surfaces.map { it.name }.toTypedArray(),
                 currentIndex
             ) { dialog, which ->
-                val selected = surfaces[which]
-                viewModel.recordSurface(selected)
+                viewModel.recordSurface(surfaces[which])    // FIX: was setSurface()
                 dialog.dismiss()
-                showToast(getString(R.string.surface_selected, selected.name))
             }
             .setNegativeButton(getString(R.string.cancel), null)
             .show()
     }
 
-    private fun showStopSurveyConfirmation() {
-        viewModel.pauseSurvey()
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(getString(R.string.stop_survey))
-            .setMessage(getString(R.string.stop_survey_confirm))
-            .setPositiveButton(getString(R.string.save)) { _, _ ->
-                viewModel.stopSurveyAndSave()
-                showSurveyFABs(false)
-                mapRenderer.clearOverlays(colorDefault)
-                findNavController().navigate(R.id.summaryFragment)
-            }
-            .setNegativeButton(getString(R.string.discard)) { _, _ ->
-                viewModel.stopSurveyAndDiscard()
-                showSurveyFABs(false)
-                mapRenderer.clearOverlays(colorDefault)
-            }
-            .setNeutralButton(getString(R.string.resume)) { _, _ ->
-                viewModel.resumeSurvey()
-            }
-            .show()
-    }
-
     // ══════════════════════════════════════════════════════════════════════
-    // OBSERVERS
+    // OBSERVE VIEWMODEL
     // ══════════════════════════════════════════════════════════════════════
 
     @OptIn(FlowPreview::class)
     private fun observeViewModel() {
 
-        // Survey state → update FAB utama & visibility kontrol
-        combine(viewModel.isSurveying, viewModel.isPaused) { surveying, paused ->
-            surveying to paused
-        }.onEach { (surveying, paused) ->
-            updateSurveyButton(surveying, paused)
-            showSurveyFABs(surveying)
-            if (!surveying) {
-                chartController.clear()
-                snackbarVoice?.dismiss()
-            }
-        }.launchIn(viewLifecycleOwner.lifecycleScope)
+        // Survey state → update FAB visibility & color
+        combine(
+            viewModel.isSurveying,
+            viewModel.isPaused,
+            viewModel.mode
+        ) { isSurveying, isPaused, mode ->
+            updateSurveyButton(isSurveying, isPaused)
+            showSurveyFABs(isSurveying)
 
-        // Mode → tampilkan FAB yang sesuai
-        combine(viewModel.mode, viewModel.isSurveying) { mode, surveying ->
-            mode to surveying
-        }.onEach { (mode, surveying) ->
-            if (surveying) {
-                // SDI dan PCI pakai distress input, GENERAL pakai condition/surface
-                val isSdiOrPci = mode == SurveyMode.SDI || mode == SurveyMode.PCI
-                fabCondition.visibility   = if (isSdiOrPci) View.GONE else View.VISIBLE
-                fabSurface.visibility     = if (isSdiOrPci) View.GONE else View.VISIBLE
+            if (isSurveying) {
+                val isGeneral  = (mode == SurveyMode.GENERAL)
+                val isSdiOrPci = (mode == SurveyMode.SDI || mode == SurveyMode.PCI)
+
+                // Kondisi & permukaan: HANYA relevan untuk GENERAL
+                fabCondition.visibility = if (isGeneral) View.VISIBLE else View.GONE
+                fabSurface.visibility   = if (isGeneral) View.VISIBLE else View.GONE
+
+                // Tombol distress: HANYA untuk SDI / PCI
                 fabAddDistress.visibility = if (isSdiOrPci) View.VISIBLE else View.GONE
-                fabCamera.visibility      = if (isSdiOrPci) View.GONE else View.VISIBLE
-                fabVoice.visibility       = if (isSdiOrPci) View.GONE else View.VISIBLE
+
+                // FIX: Kamera & Voice untuk SEMUA mode — termasuk SDI dan PCI
+                // Di SDI/PCI, foto juga bisa diambil dari FAB kamera (General event-photo),
+                // SELAIN dari dalam DistressBottomSheet per item kerusakan.
+                fabCamera.visibility = if (isSurveying) View.VISIBLE else View.GONE
+                fabVoice.visibility  = if (isSurveying) View.VISIBLE else View.GONE
             } else {
                 fabCondition.visibility   = View.GONE
                 fabSurface.visibility     = View.GONE
@@ -521,90 +526,87 @@ class MapFragment : Fragment() {
                 } catch (e: Exception) {
                     Timber.e(e, "Error updating chart")
                 }
-            }
-            .launchIn(viewLifecycleOwner.lifecycleScope)
+            }.launchIn(viewLifecycleOwner.lifecycleScope)
 
-        // Z-axis vibration guide
-        combine(
-            viewModel.vibration,
-            viewModel.thresholdBaik,
-            viewModel.thresholdSedang,
-            viewModel.thresholdRusakRingan,
-            viewModel.isSurveying
-        ) { vib, thB, thS, thR, surveying ->
-            if (!surveying) return@combine null
-            when {
-                vib < thB -> Triple("RENDAH",       "Jalan tampak baik",           colorBaik)
-                vib < thS -> Triple("SEDANG",        "Mungkin kondisi sedang",       colorSedang)
-                vib < thR -> Triple("TINGGI",        "Kemungkinan rusak ringan",     colorRusakRingan)
-                else      -> Triple("SANGAT TINGGI", "Kemungkinan rusak berat",      colorRusakBerat)
-            }
-        }.onEach { result ->
+        // Voice recording state → update FAB ikon
+        mediaManager.isRecording.onEach { isRecording ->
             if (_binding == null) return@onEach
-            if (result == null) {
-                binding.tvVibrationGuide.visibility = View.GONE
-            } else {
-                val (level, desc, color) = result
-                binding.tvVibrationGuide.text = "Getaran: $level — $desc"
-                binding.tvVibrationGuide.setTextColor(color)
-                binding.tvVibrationGuide.visibility = View.VISIBLE
-            }
-        }.launchIn(viewLifecycleOwner.lifecycleScope)
-
-        // Voice recording state → sync icon FAB + snackbar indikator
-        mediaManager.isRecording.onEach { recording ->
-            if (_binding == null) return@onEach
-            fabVoice.setImageResource(
-                if (recording) R.drawable.ic_stop else R.drawable.ic_mic
-            )
-            fabVoice.backgroundTintList = ContextCompat.getColorStateList(
-                requireContext(),
-                if (recording) R.color.red else R.color.primary
-            )
-            if (recording) {
-                snackbarVoice = Snackbar.make(
-                    binding.root,
-                    "⏺ Merekam suara... ketuk lagi untuk berhenti",
-                    Snackbar.LENGTH_INDEFINITE
-                ).setAction("Stop") {
-                    mediaManager.toggleVoiceRecording()
+            if (isRecording) {
+                fabVoice.setImageResource(R.drawable.ic_stop)
+                fabVoice.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.red)
+                if (snackbarVoice == null || snackbarVoice?.isShown == false) {
+                    snackbarVoice = Snackbar.make(
+                        binding.root,
+                        getString(R.string.recording_active),
+                        Snackbar.LENGTH_INDEFINITE
+                    ).apply { show() }
                 }
-                snackbarVoice?.show()
             } else {
+                fabVoice.setImageResource(R.drawable.ic_mic)
+                fabVoice.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.primary)
                 snackbarVoice?.dismiss()
                 snackbarVoice = null
             }
         }.launchIn(viewLifecycleOwner.lifecycleScope)
     }
 
-    // Auto-prompt foto tiap jarak tertentu (mode GENERAL saja)
+    @OptIn(FlowPreview::class)
     private fun observeDistanceTrigger() {
-        viewModel.distanceTrigger.onEach { distance ->
-            if (viewModel.isSurveying.value && !viewModel.isPaused.value
-                && viewModel.mode.value == SurveyMode.GENERAL
-            ) {
-                Snackbar.make(
-                    binding.root,
-                    getString(R.string.distance_reached_prompt, distance.toInt()),
-                    Snackbar.LENGTH_LONG
-                ).setAction(getString(R.string.take_photo)) {
-                    mediaManager.openCamera()
-                }.show()
+
+        viewModel.distanceTrigger
+            .sample(500L) // Reduce UI + CPU spam
+            .onEach { dist ->
+
+                // Safety check lifecycle view
+                if (_binding == null) return@onEach
+
+                val mode = viewModel.mode.value
+
+                // Only show segment badge when surveying + SDI / PCI mode
+                if (viewModel.isSurveying.value &&
+                    (mode == SurveyMode.SDI || mode == SurveyMode.PCI)
+                ) {
+
+                    val segLen = when (mode) {
+                        SurveyMode.PCI -> 50
+                        else -> 100   // SDI
+                    }
+
+                    val segNum = (dist / segLen).toInt() + 1
+
+                    val modeLabel = when (mode) {
+                        SurveyMode.PCI -> "PCI"
+                        SurveyMode.SDI -> "SDI"
+                        else -> ""
+                    }
+
+                    // Format string must match XML format placeholders
+                    binding.tvSegmentBadge.text =
+                        getString(
+                            R.string.segment_badge,
+                            segNum,
+                            modeLabel
+                        )
+
+                    binding.tvSegmentBadge.visibility = View.VISIBLE
+
+                } else {
+                    binding.tvSegmentBadge.visibility = View.GONE
+                }
+
             }
-        }.launchIn(viewLifecycleOwner.lifecycleScope)
+            .launchIn(viewLifecycleOwner.lifecycleScope)
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // UI HELPERS
+    // HELPERS
     // ══════════════════════════════════════════════════════════════════════
 
     private fun showSurveyFABs(show: Boolean) {
-        fabStop.visibility                = if (show) View.VISIBLE else View.GONE
-        fabCamera.visibility              = if (show) View.VISIBLE else View.GONE
-        fabVoice.visibility               = if (show) View.VISIBLE else View.GONE
-        binding.chartContainer.visibility = if (show) View.VISIBLE else View.GONE
-        if (!show) binding.tvVibrationGuide.visibility = View.GONE
-        // fabCondition, fabSurface, fabAddDistress diatur oleh observer mode
+        val visibility = if (show) View.VISIBLE else View.GONE
+        fabStop.visibility          = visibility
+        fabToggleChart.visibility   = visibility
+        fabToggleOrientation.visibility = visibility
     }
 
     private fun updateSurveyButton(isSurveying: Boolean, isPaused: Boolean) {

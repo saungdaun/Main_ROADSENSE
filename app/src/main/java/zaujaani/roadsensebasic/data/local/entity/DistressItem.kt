@@ -5,21 +5,28 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-// FIX: tambah indices untuk kolom segmentId yang ada ForeignKey
-// Tanpa ini KSP warning: "may trigger full table scans"
+/**
+ * DistressItem — satu entri kerusakan untuk survei SDI (Bina Marga).
+ *
+ * FIX #6 KRITIS: Kolom `notes` hilang dari skema sebelumnya.
+ *   - DistressViewModel.saveDistress() mengirim `notes` ke addDistressItem()
+ *   - SurveyEngine.addDistressItem() membuat DistressItem
+ *   - Tapi entity tidak punya field `notes` → catatan surveyor HILANG diam-diam!
+ *   - Diperbaiki dengan menambahkan field `notes` + migration 9→10
+ */
 @Entity(
     tableName = "distress_items",
     foreignKeys = [
         ForeignKey(
-            entity = SegmentSdi::class,
+            entity        = SegmentSdi::class,
             parentColumns = ["id"],
-            childColumns = ["segmentId"],
-            onDelete = ForeignKey.CASCADE
+            childColumns  = ["segmentId"],
+            onDelete      = ForeignKey.CASCADE
         )
     ],
     indices = [
         Index(value = ["segmentId"]),
-        Index(value = ["sessionId"])    // sessionId juga sering di-query, worth indexing
+        Index(value = ["sessionId"])
     ]
 )
 data class DistressItem(
@@ -35,5 +42,7 @@ data class DistressItem(
     val gpsLat: Double,
     val gpsLng: Double,
     val sta: String,
+    // FIX #6: Tambah field notes yang sebelumnya hilang
+    val notes: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
