@@ -2,6 +2,7 @@
 Digital Pavement Condition Survey & PCI Engine for Android
 
 A field-ready prototype for mobile road condition assessment and Pavement Management System (PMS) research.
+Built as a foundation toward scalable digital pavement management solutions.
 
 🌍 Why This Project Matters
 
@@ -74,6 +75,21 @@ PDF export capability
 File exporter utility
 
 Survey summary dashboard
+
+🧠 Core Strengths
+
+Field-ready architecture designed for real-time survey workflow
+
+Modular PCI & SDI computation engine
+
+Database schema versioning for data consistency
+
+Clear separation between UI, domain logic, and persistence layer
+
+📘 Engineering Context
+
+The Pavement Condition Index (PCI) method is widely used to assess road surface performance based on distress type, severity, and density.
+This application digitizes the evaluation process and integrates it with segment-based road tracking and automated computation.
 
 🏗️ Architecture
 
