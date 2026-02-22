@@ -4,17 +4,19 @@ Digital Pavement Condition Survey & PCI Engine for Android
 A field-ready prototype for mobile road condition assessment and Pavement Management System (PMS) research.  
 Built as a foundation toward scalable digital pavement management solutions.
 
----
 
-## 📸 Application Preview
+📸 Application Preview
 
-### 📊 Survey Detail & Condition Distribution
+🗺 Field Survey & Condition Mapping
 
 <p align="center">
-  <img src="screenshots/survey_detail_screen.png" width="300"/>
+  <img src="screenshots/survey_detail_screen.png" width="250"/>
+  <img src="screenshots/pci_1.png" width="250"/>
 </p>
 
-> Example of real survey session output with automatic condition aggregation.
+---
+
+📊 1️⃣ Survey Detail & Surface Distribution
 
 This screen demonstrates:
 - Surface distribution statistics (Asphalt vs Concrete)
@@ -22,9 +24,18 @@ This screen demonstrates:
 - Important survey points with photo documentation
 - GPX export capability
 
----
 
-## 🌍 Why This Project Matters
+
+🧮 2️⃣ PCI Evaluation & Engineering Output
+
+This screen shows:
+- Automated PCI score calculation (0–100 scale)
+- Condition categorization (Sangat Baik, Baik, Sedang, etc.)
+- Recommended action logic
+- Segment-based breakdown with dominant distress identification
+- PDF export capability
+
+🌍 Why This Project Matters
 
 Road infrastructure monitoring in many developing regions still relies on manual surveys and fragmented reporting systems.
 
