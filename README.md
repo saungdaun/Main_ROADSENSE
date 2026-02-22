@@ -7,32 +7,31 @@ Built as a foundation toward scalable digital pavement management solutions.
 
 📸 Application Preview
 
-🗺 Field Survey & Condition Mapping
+🗺 Field Survey, Mapping & PCI Evaluation
 
 <p align="center">
-  <img src="screenshots/survey_detail_screen.png" width="250"/>
-  <img src="screenshots/pci_1.png" width="250"/>
+  <img src="screenshots/map_1.png" width="220"/>
+  <img src="screenshots/survey_detail_screen.png" width="220"/>
+  <img src="screenshots/pci_2.png" width="220"/>
 </p>
 
----
-
-📊 1️⃣ Survey Detail & Surface Distribution
-
-This screen demonstrates:
-- Surface distribution statistics (Asphalt vs Concrete)
-- Segment-based condition classification (BAIK, SEDANG, RUSAK_RINGAN)
-- Important survey points with photo documentation
-- GPX export capability
 
 
+### 1️⃣ GPS-Based Road Survey
+- Real-time GPS tracking
+- Road segment mapping
+- Continuous foreground tracking service
 
-🧮 2️⃣ PCI Evaluation & Engineering Output
+### 2️⃣ Surface & Distress Recording
+- Surface distribution (Asphalt / Concrete)
+- Segment-based condition classification
+- Photo documentation per STA
 
-This screen shows:
-- Automated PCI score calculation (0–100 scale)
-- Condition categorization (Sangat Baik, Baik, Sedang, etc.)
-- Recommended action logic
-- Segment-based breakdown with dominant distress identification
+### 3️⃣ Automated PCI Engineering Output
+- PCI score (0–100 scale)
+- Condition categorization
+- Recommended treatment logic
+- Segment-level breakdown
 - PDF export capability
 
 🌍 Why This Project Matters
