@@ -176,6 +176,15 @@ SDI Engine: Implemented
 
 PDF Export: Available
 
+Map Data & Attribution
+
+This application uses map data from OpenStreetMap.
+
+© OpenStreetMap contributors  
+https://www.openstreetmap.org
+
+OpenStreetMap data is licensed under the Open Database License (ODbL).
+
 ⚠ Disclaimer
 
 This application is a research and development prototype.
@@ -184,4 +193,5 @@ It is not intended for official engineering decisions without proper validation 
 👨‍💻 Author
 
 Developed by Hatta
+saungdaun@gmail.com
 Road Infrastructure & Urban Planning Enthusiast
