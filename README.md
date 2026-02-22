@@ -1,21 +1,39 @@
-🚧 RoadSenseBasic
+# 🚧 RoadSenseBasic
 Digital Pavement Condition Survey & PCI Engine for Android
 
-A field-ready prototype for mobile road condition assessment and Pavement Management System (PMS) research.
+A field-ready prototype for mobile road condition assessment and Pavement Management System (PMS) research.  
 Built as a foundation toward scalable digital pavement management solutions.
 
-🌍 Why This Project Matters
+---
+
+## 📸 Application Preview
+
+### 📊 Survey Detail & Condition Distribution
+
+<p align="center">
+  <img src="screenshots/survey_detail_screen.png" width="300"/>
+</p>
+
+> Example of real survey session output with automatic condition aggregation.
+
+This screen demonstrates:
+- Surface distribution statistics (Asphalt vs Concrete)
+- Segment-based condition classification (BAIK, SEDANG, RUSAK_RINGAN)
+- Important survey points with photo documentation
+- GPX export capability
+
+---
+
+## 🌍 Why This Project Matters
 
 Road infrastructure monitoring in many developing regions still relies on manual surveys and fragmented reporting systems.
+
 RoadSenseBasic provides a lightweight, mobile-first digital solution for:
 
-Pavement Condition Index (PCI) calculation
-
-Surface Distress Index (SDI) evaluation
-
-Road segment-based condition tracking
-
-Field survey digitization
+- Pavement Condition Index (PCI) calculation
+- Surface Distress Index (SDI) evaluation
+- Road segment-based condition tracking
+- Field survey digitization
 
 This project serves as a prototype toward a smarter and more scalable Pavement Management System (PMS).
 
