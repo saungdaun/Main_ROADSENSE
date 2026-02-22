@@ -1,4 +1,7 @@
-🚧 RoadSenseBasic
+# 🚧 RoadSenseBasic
+
+> Digital Pavement Condition Survey & PCI Engine for Android  
+> A field-ready prototype for infrastructure monitoring and pavement management research.
 
 Android-Based Road Condition Survey & PCI Calculation System
 
