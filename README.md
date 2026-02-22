@@ -1,16 +1,25 @@
-# 🚧 RoadSenseBasic
+🚧 RoadSenseBasic
+Digital Pavement Condition Survey & PCI Engine for Android
 
-> Digital Pavement Condition Survey & PCI Engine for Android  
-> A field-ready prototype for infrastructure monitoring and pavement management research.
+A field-ready prototype for mobile road condition assessment and Pavement Management System (PMS) research.
 
-Android-Based Road Condition Survey & PCI Calculation System
+🌍 Why This Project Matters
 
-RoadSenseBasic is a field-based Android application designed for road condition data collection, PCI (Pavement Condition Index) computation, SDI calculation, and survey reporting.
+Road infrastructure monitoring in many developing regions still relies on manual surveys and fragmented reporting systems.
+RoadSenseBasic provides a lightweight, mobile-first digital solution for:
 
-This project aims to support digital transformation in road infrastructure monitoring and pavement management systems.
+Pavement Condition Index (PCI) calculation
+
+Surface Distress Index (SDI) evaluation
+
+Road segment-based condition tracking
+
+Field survey digitization
+
+This project serves as a prototype toward a smarter and more scalable Pavement Management System (PMS).
 
 📌 Key Features
-🗺️ 1. GPS-Based Road Survey
+🗺️ GPS-Based Road Survey
 
 Real-time GPS tracking
 
@@ -20,7 +29,7 @@ Survey session recording
 
 Foreground service for continuous tracking
 
-📊 2. Pavement Condition Index (PCI)
+📊 Pavement Condition Index (PCI)
 
 Distress type classification
 
@@ -30,7 +39,7 @@ Automatic PCI calculation engine
 
 Segment-based PCI aggregation
 
-📉 3. Surface Distress Index (SDI)
+📉 Surface Distress Index (SDI)
 
 Automated SDI computation
 
@@ -38,43 +47,48 @@ Integrated survey engine
 
 Road condition categorization
 
-🧮 4. Calculation Engine
+🧮 Calculation Engine
 
 Modular PCI calculator
 
-SDI engine
+SDI computation module
 
-Clean architecture (Domain Layer separation)
+Domain-layer separation
 
-🗄️ 5. Local Database (Room)
+Extensible evaluation logic
+
+🗄️ Local Database (Room)
 
 Versioned schema migration
 
 RoadSegment entity
 
-Distress entity
+Distress entities
 
 Survey session management
 
-📄 6. Export & Reporting
+📄 Export & Reporting
 
-PDF export
+PDF export capability
 
 File exporter utility
 
-Summary dashboard
+Survey summary dashboard
 
 🏗️ Architecture
 
-This project follows clean modular layering:
+This project follows a clean layered architecture:
 
 UI Layer
+   ↓
 ViewModel
+   ↓
 Repository
-Domain Engine (PCI / SDI Calculator)
+   ↓
+Domain Engine (PCI / SDI)
+   ↓
 Room Database
-
-Technologies used:
+Technologies Used
 
 Kotlin
 
@@ -84,7 +98,7 @@ Room Database
 
 Foreground Service
 
-MVVM Pattern
+MVVM Architecture
 
 📂 Project Structure Overview
 data/
@@ -92,25 +106,27 @@ data/
  │    ├── dao/
  │    ├── entity/
  │    └── RoadSenseDatabase.kt
+
 domain/
  └── engine/
       ├── Pcicalculator.kt
       └── SDICalculator.kt
+
 ui/
  ├── map/
  ├── distress/
  └── summary/
-🎯 Target Use Case
+🎯 Target Use Cases
 
 Road infrastructure monitoring
 
-Pavement condition survey
+Pavement condition surveys
 
-Local government field survey
+Local government field inspection
 
-Academic research (PWK / Civil Engineering)
+Academic research (Urban Planning / Civil Engineering)
 
-Smart road inspection prototype
+Smart road inspection prototype development
 
 📱 Minimum Requirements
 
@@ -122,23 +138,32 @@ Storage permission for report export
 
 🚀 Future Development
 
-Cloud sync (Firebase / Backend API)
+Cloud synchronization (Firebase / backend API)
 
 GIS integration
 
 Multi-user survey system
 
-Dashboard analytics
+Analytical dashboard
 
 Web-based monitoring panel
 
 📌 Project Status
 
 🟢 Active Development
-Schema version: v9
+
+Schema Version: v9
+
 PCI Engine: Implemented
+
 SDI Engine: Implemented
+
 PDF Export: Available
+
+⚠ Disclaimer
+
+This application is a research and development prototype.
+It is not intended for official engineering decisions without proper validation and calibration.
 
 👨‍💻 Author
 
