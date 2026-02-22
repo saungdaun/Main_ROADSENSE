@@ -1,256 +1,289 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App -->
     <string name="app_name">RoadSense Basic</string>
+
     <!-- Drawer Header -->
     <string name="drawer_title">RoadSense Basic</string>
-    <string name="drawer_subtitle">Survey Kondisi Jalan</string>
+    <string name="drawer_subtitle">Road Condition Survey</string>
+
     <!-- Menu -->
     <string name="menu_map">Map</string>
     <string name="menu_summary">Summary</string>
     <string name="menu_settings">Settings</string>
+    <string name="menu_bluetooth">Bluetooth</string>
+
     <!-- Screen Titles -->
     <string name="title_map">Map</string>
     <string name="title_summary">Summary</string>
     <string name="title_settings">Settings</string>
+
+    <!-- Units -->
     <string name="unit_kmh">km/h</string>
     <string name="unit_m">m</string>
     <string name="unit_km">km</string>
     <string name="unit_g">g</string>
+
+    <!-- Format strings -->
     <string name="gps_accuracy">Acc: %.1f m</string>
     <string name="vibration_format">%.2f g</string>
     <string name="accuracy_format">Acc: %.1f m</string>
     <string name="confidence_value">Confidence: %d%%</string>
-    <string name="condition_auto">Kondisi otomatis: %s</string>
-    <string name="permission_denied">Izin ditolak: %s</string>
-    <string name="gps_accuracy_low">Akurasi GPS rendah</string>
-    <string name="gps_accuracy_fair">Akurasi GPS cukup</string>
-    <string name="gps_accuracy_good">Akurasi GPS baik</string>
-    <string name="take">Ambil</string>
-    <string name="play_recording">Putar Rekaman</string>
-    <string name="play_failed">Gagal memutar</string>
-    <string name="road_name_required">Nama ruas harus diisi</string>
-    <string name="default_surface">Aspal</string>
-    <string name="jarak_prefix">Jarak: %s</string>
-    <string name="segments_prefix">Segmen: %d</string>
-    <string name="confidence_avg_prefix">Confidence rata-rata: %d%%</string>
-    <string name="device_prefix">Device: %s</string>
-    <string name="no_sessions">Belum ada survey</string>
-    <string name="distance_m">Jarak: %d m</string>
-    <string name="distance_km">Jarak: %.2f km</string>
-    <string name="segments_count">Segmen: %d</string>
-    <string name="confidence_avg">Confidence rata-rata: %d%%</string>
-    <string name="device_model">Device: %s</string>
-    <string name="confidence_label">Confidence:</string>
-    <string name="road_name_hint">Nama Ruas</string>
-    <string name="condition_hint">Kondisi Visual</string>
-    <string name="surface_hint">Jenis Permukaan</string>
-    <string name="voice_record">Rekam Catatan Suara</string>
-    <string name="notes_hint">Catatan (opsional)</string>
-    <string name="total_distance">Total_Jarak\n</string>
-    <string name="segment_count">Ruas_Ke\n</string>
-    <string name="detail_coming_soon">Detail untuk sesi %d (coming soon)</string>
-    <string name="label_speed">Kecepatan</string>
-    <string name="label_distance">Jarak</string>
-    <string name="label_vibration">Getaran</string>
-    <string name="label_accuracy">Akurasi</string>
-    <string name="chart_label_z">Z-Axis (g)</string>
-    <string name="content_desc_survey_fab">Mulai / Jeda Survey</string>
-    <string name="content_desc_stop_fab">Hentikan Survey</string>
-    <string name="content_desc_segment_fab">Buat Segmen</string>
-    <string name="content_desc_chart_toggle">Tampilkan Grafik</string>
-    <string name="content_desc_camera_fab">Ambil Foto</string>
-    <string name="content_desc_voice_fab">Rekam Suara</string>
-    <string name="content_desc_condition_fab">Pilih Kondisi</string>
-    <string name="content_desc_surface_fab">Pilih Permukaan</string>
-    <!-- Strings untuk SummaryFragment - Detail Dialog -->
-    <string name="detail_title">Detail Survey</string>
-    <string name="detail_date">Tanggal: %s</string>
-    <string name="detail_device">Perangkat: %s</string>
-    <string name="detail_surveyor">Surveyor: %s</string>
-    <string name="survey_note_hint">Catatan Survey (opsional)</string>
-    <string name="detail_total_distance">Total Jarak: %s</string>
-    <string name="detail_duration">Durasi: %d menit</string>
-    <string name="detail_segment_count">Jumlah Segmen: %d</string>
-    <string name="detail_avg_confidence">Rata-rata Confidence: %d%%</string>
-    <string name="detail_photos">Jumlah Foto: %d</string>
-    <string name="detail_audios">Jumlah Rekaman: %d</string>
-    <string name="detail_condition_header">Distribusi Kondisi Jalan:</string>
-    <string name="detail_surface_header">Distribusi Permukaan:</string>
-    <string name="detail_segments_header">Daftar Segmen:</string>
-    <string name="no_name">Tanpa Nama</string>
-    <string name="threshold_baik_label">Baik: %s g</string>
-    <string name="threshold_sedang_label">Sedang: %s g</string>
-    <string name="threshold_rusak_label">Rusak Ringan: %s g</string>
-    <string name="gps_interval_label">Interval GPS: %d ms</string>
-    <string name="menu_bluetooth">Bluetooth</string>
-    <string name="segment_start_title">Mulai: %s</string>
-    <string name="segment_marker_snippet" formatted="false">%s, %s, %d m</string>
-    <string name="segment_end_title">Akhir: %s</string>
-    <string name="segment_condition_label">Kondisi: %s</string>
-    <string name="condition_baik">Baik</string>
-    <string name="condition_sedang">Sedang</string>
-    <string name="condition_rusak_ringan">Rusak Ringan</string>
-    <string name="chart_no_data">Tunggu data…</string>
-    <string name="chart_z_label">Z-Axis (g)</string>
-    <string name="segment_started_toast">Segmen dimulai</string>
-    <string name="camera_quick_tip">Ambil foto cepat</string>
-    <string name="voice_quick_tip">Rekam catatan suara</string>
-
-    <string name="event_count">Jumlah event</string>
-    <string name="scan_devices">Scan Perangkat</string>
-    <string name="mac_address_hint">Alamat MAC</string>
-    <string name="connect">Hubungkan</string>
-    <string name="disconnect">Putuskan</string>
-    <string name="command_hint">Perintah</string>
-    <string name="send_command">Kirim Perintah</string>
-    <string name="received_data">Data Terima:</string>
-    <string name="clear">Bersihkan</string>
-    <string name="enter_mac_address">Masukkan alamat MAC</string>
-    <string name="no_devices_found">Tidak ada perangkat ditemukan</string>
-    <string name="connected">Terhubung</string>
-    <string name="connecting">Menghubungkan…</string>
-    <string name="disconnected">Terputus</string>
-    <string name="error">Error</string>
-    <string name="select_device">Pilih Perangkat</string>
-    <string name="view_photos">Lihat Foto</string>
-    <string name="no_photos">Tidak ada foto</string>
-    <string name="photo_file_not_found">File foto tidak ditemukan</string>
-    <string name="previous">Sebelumnya</string>
-    <string name="next">Berikutnya</string>
-
-    <!-- Baru - tambahkan di strings.xml -->
-    <string name="condition_rusak_berat">Rusak Berat</string>
-
-    <string name="timer_default">00:00</string>
-
-    <string name="mode_general">Umum</string>
-    <string name="mode_sdi">SDI</string>
-    <string name="select_mode">Pilih Mode</string>
-    <string name="distress_type_hint">Jenis Kerusakan</string>
-    <string name="severity_label">Tingkat Keparahan</string>
-    <string name="severity_low">Ringan</string>
-    <string name="severity_medium">Sedang</string>
-    <string name="severity_high">Berat</string>
-    <string name="custom_value_hint">Isi sendiri</string>
-    <string name="add_photo">Tambah Foto</string>
-    <string name="sdi_average" formatted="false">Rata-rata SDI: %d (%s)</string>
-    <string name="watermark_coord" formatted="false">GPS: %s, %s</string>
-
-
-
-    <string name="photo_thumbnail">Thumbnail foto</string>
-
-    <!-- ================================================================
-     strings.xml — TAMBAHAN untuk RoadSense
-     Tambahkan entry-entry berikut ke dalam res/values/strings.xml
-     yang sudah ada (jangan replace seluruh file, cukup tambahkan)
-     ================================================================ -->
-
-    <!-- String baru yang dipakai MapFragment versi terbaru -->
-    <string name="sdi_mode_required">Tidak dalam mode SDI atau survey tidak aktif</string>
-
-    <!-- String ini mungkin sudah ada, pastikan ada semua -->
-    <string name="survey_not_active">Survey belum aktif</string>
-    <string name="start_survey">Mulai Survey</string>
-    <string name="start">Mulai</string>
-    <string name="stop">Stop</string>
-    <string name="save">Simpan</string>
-    <string name="discard">Buang</string>
-    <string name="resume">Lanjutkan</string>
-    <string name="cancel">Batal</string>
-    <string name="ok">OK</string>
-    <string name="close">Tutup</string>
-    <string name="delete">Hapus</string>
-
-    <string name="stop_survey">Akhiri Survey</string>
-    <string name="stop_survey_confirm">Apakah kamu ingin menyimpan data survey ini?</string>
-    <string name="surveyor_name_required">Nama surveyor wajib diisi</string>
-
-    <string name="pick_condition_title">Pilih Kondisi Jalan</string>
-    <string name="pick_surface_title">Pilih Jenis Permukaan</string>
-    <string name="condition_selected">Kondisi: %s</string>
-    <string name="surface_selected">Permukaan: %s</string>
-    <string name="warning_title">Peringatan</string>
-    <string name="condition_mismatch_message">Getaran sensor tidak sesuai dengan kondisi \"%s\" yang dipilih. Yakin ingin tetap memilih kondisi ini?</string>
-
-    <string name="orientation_enabled">Rotasi peta: Aktif</string>
-    <string name="orientation_disabled">Rotasi peta: Nonaktif</string>
-
-    <string name="take_photo">Foto</string>
-    <string name="distance_reached_prompt">%d m tercapai — ambil foto dokumentasi?</string>
-
+    <string name="condition_auto">Auto condition: %s</string>
     <string name="speed_format">%d km/h</string>
     <string name="distance_m_format">%d m</string>
     <string name="distance_km_format">%.2f km</string>
-
-    <!-- Notifikasi service -->
-    <string name="notification_title">RoadSense Survey Aktif</string>
-    <string name="survey_running">Survey berjalan…</string>
-    <string name="survey_paused">Survey dijeda</string>
-    <string name="notification_survey_progress">Jarak: %s</string>
-    <string name="notification_channel_desc">Notifikasi progres survey jalan</string>
     <string name="distance_m_format_notif">%d m</string>
     <string name="distance_km_format_notif">%.2f km</string>
-
-    <!-- Watermark foto -->
+    <string name="watermark_coord" formatted="false">GPS: %s, %s</string>
     <string name="watermark_app_name">RoadSense</string>
-    <string name="watermark_distance">Jarak: %d m</string>
+    <string name="watermark_distance">Distance: %d m</string>
 
+    <!-- Permissions -->
+    <string name="permission_denied">Permission denied: %s</string>
 
-    <!-- Distress Bottom Sheet -->
-    <string name="distress_saved">Data kerusakan tersimpan</string>
-    <string name="select_distress_type">Pilih jenis kerusakan terlebih dahulu</string>
-    <string name="select_severity">Pilih tingkat keparahan terlebih dahulu</string>
-    <string name="enter_length_area">Masukkan panjang atau luas kerusakan</string>
-    <string name="invalid_data">Data tidak valid, periksa kembali</string>
-    <string name="record_voice">Rekam Suara</string>
-    <string name="recording_failed">Gagal memulai rekaman</string>
-    <string name="audio_saved">Rekaman tersimpan</string>
-    <string name="photo_saved">Foto tersimpan</string>
-    <string name="photo_failed">Gagal mengambil foto</string>
-    <string name="file_not_found">File foto tidak ditemukan</string>
-    <string name="camera_permission_required">Izin kamera diperlukan</string>
-    <string name="microphone_permission_required">Izin mikrofon diperlukan</string>
+    <!-- GPS Status -->
+    <string name="gps_accuracy_low">GPS accuracy low</string>
+    <string name="gps_accuracy_fair">GPS accuracy fair</string>
+    <string name="gps_accuracy_good">GPS accuracy good</string>
 
-    <!-- Unit label -->
-    <string name="unit_length">m (panjang)</string>
-    <string name="unit_area">m² (luas)</string>
+    <!-- General UI -->
+    <string name="take">Take</string>
+    <string name="play_recording">Play Recording</string>
+    <string name="play_failed">Playback failed</string>
+    <string name="road_name_required">Road name is required</string>
+    <string name="default_surface">Asphalt</string>
+    <string name="no_sessions">No surveys yet</string>
+    <string name="no_name">Unnamed</string>
+
+    <!-- Labels / Prefixes -->
+    <string name="jarak_prefix">Distance: %s</string>
+    <string name="segments_prefix">Segments: %d</string>
+    <string name="confidence_avg_prefix">Avg Confidence: %d%%</string>
+    <string name="device_prefix">Device: %s</string>
+    <string name="distance_m">Distance: %d m</string>
+    <string name="distance_km">Distance: %.2f km</string>
+    <string name="segments_count">Segments: %d</string>
+    <string name="confidence_avg">Avg Confidence: %d%%</string>
+    <string name="device_model">Device: %s</string>
+    <string name="confidence_label">Confidence:</string>
+    <string name="label_speed">Speed</string>
+    <string name="label_distance">Distance</string>
+    <string name="label_vibration">Vibration</string>
+    <string name="label_accuracy">Accuracy</string>
+
+    <!-- Input hints -->
+    <string name="road_name_hint">Road Name</string>
+    <string name="condition_hint">Visual Condition</string>
+    <string name="surface_hint">Surface Type</string>
+    <string name="voice_record">Record Voice Note</string>
+    <string name="notes_hint">Notes (optional)</string>
+    <string name="survey_note_hint">Survey Notes (optional)</string>
+    <string name="surveyor_name_hint">Enter Surveyor Name</string>
+    <string name="mac_address_hint">MAC Address</string>
+    <string name="command_hint">Command</string>
+
+    <!-- Segment / STA -->
+    <string name="total_distance">Total_Distance\n</string>
+    <string name="segment_count">Segment_No\n</string>
+    <string name="segment_start_title">Start: %s</string>
+    <string name="segment_marker_snippet" formatted="false">%s, %s, %d m</string>
+    <string name="segment_end_title">End: %s</string>
+    <string name="segment_condition_label">Condition: %s</string>
+    <string name="segment_started_toast">Segment started</string>
+    <string name="detail_coming_soon">Details for session %d (coming soon)</string>
+
+    <!-- Content Descriptions -->
+    <string name="content_desc_survey_fab">Start / Pause Survey</string>
+    <string name="content_desc_stop_fab">Stop Survey</string>
+    <string name="content_desc_segment_fab">New Segment</string>
+    <string name="content_desc_chart_toggle">Toggle Chart</string>
+    <string name="content_desc_camera_fab">Take Photo</string>
+    <string name="content_desc_voice_fab">Record Voice</string>
+    <string name="content_desc_condition_fab">Select Condition</string>
+    <string name="content_desc_surface_fab">Select Surface</string>
+
+    <!-- Chart -->
+    <string name="chart_label_z">Z-Axis (g)</string>
+    <string name="chart_no_data">Waiting for data…</string>
+    <string name="chart_z_label">Z-Axis (g)</string>
+
+    <!-- Summary / Detail Dialog -->
+    <string name="detail_title">Survey Detail</string>
+    <string name="detail_date">Date: %s</string>
+    <string name="detail_device">Device: %s</string>
+    <string name="detail_surveyor">Surveyor: %s</string>
+    <string name="detail_total_distance">Total Distance: %s</string>
+    <string name="detail_duration">Duration: %d minutes</string>
+    <string name="detail_segment_count">Segments: %d</string>
+    <string name="detail_avg_confidence">Avg Confidence: %d%%</string>
+    <string name="detail_photos">Photos: %d</string>
+    <string name="detail_audios">Recordings: %d</string>
+    <string name="detail_condition_header">Road Condition Distribution:</string>
+    <string name="detail_surface_header">Surface Distribution:</string>
+    <string name="detail_segments_header">Segment List:</string>
+
+    <!-- Settings -->
+    <string name="threshold_baik_label">Good: %s g</string>
+    <string name="threshold_sedang_label">Fair: %s g</string>
+    <string name="threshold_rusak_label">Light Damage: %s g</string>
+    <string name="gps_interval_label">GPS Interval: %d ms</string>
+
+    <!-- Settings Section Headers -->
+    <string name="settings_section_vibration">Vibration Threshold</string>
+    <string name="settings_section_gps">GPS Interval (ms)</string>
+    <string name="settings_section_unit">Distance Unit</string>
+    <string name="settings_section_theme">Theme</string>
+    <string name="settings_section_language">Language</string>
+
+    <!-- Language options -->
+    <string name="lang_english">English</string>
+    <string name="lang_indonesian">Bahasa Indonesia</string>
+    <string name="lang_restart_note">Language applied immediately.</string>
+
+    <!-- Theme options -->
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">System</string>
+
+    <!-- Conditions -->
+    <string name="condition_baik">Good</string>
+    <string name="condition_sedang">Fair</string>
+    <string name="condition_rusak_ringan">Light Damage</string>
+    <string name="condition_rusak_berat">Severe Damage</string>
+
+    <!-- Survey Actions -->
+    <string name="start_survey">Start Survey</string>
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+    <string name="save">Save</string>
+    <string name="discard">Discard</string>
+    <string name="resume">Resume</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="close">Close</string>
+    <string name="delete">Delete</string>
+    <string name="stop_survey">End Survey</string>
+    <string name="stop_survey_confirm">Do you want to save this survey data?</string>
+    <string name="surveyor_name_required">Surveyor name is required</string>
+    <string name="survey_not_active">Survey not active</string>
+
+    <!-- Condition / Surface pickers -->
+    <string name="pick_condition_title">Select Road Condition</string>
+    <string name="pick_surface_title">Select Surface Type</string>
+    <string name="condition_selected">Condition: %s</string>
+    <string name="surface_selected">Surface: %s</string>
+    <string name="warning_title">Warning</string>
+    <string name="condition_mismatch_message">Sensor vibration does not match \"%s\". Are you sure you want to select this condition?</string>
+
+    <!-- Map orientation -->
+    <string name="orientation_enabled">Map rotation: On</string>
+    <string name="orientation_disabled">Map rotation: Off</string>
+
+    <!-- Photo prompt -->
+    <string name="take_photo">Photo</string>
+    <string name="distance_reached_prompt">%d m reached — take a documentation photo?</string>
+    <string name="camera_quick_tip">Quick photo</string>
+    <string name="voice_quick_tip">Record voice note</string>
+    <string name="photo_thumbnail">Photo thumbnail</string>
+
+    <!-- Notification -->
+    <string name="notification_title">RoadSense Survey Active</string>
+    <string name="survey_running">Survey running…</string>
+    <string name="survey_paused">Survey paused</string>
+    <string name="notification_survey_progress">Distance: %s</string>
+    <string name="notification_channel_desc">Road survey progress notification</string>
+    <string name="action_pause">Pause ⏸</string>
+
+    <!-- Bluetooth -->
+    <string name="scan_devices">Scan Devices</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="send_command">Send Command</string>
+    <string name="received_data">Received Data:</string>
+    <string name="clear">Clear</string>
+    <string name="enter_mac_address">Enter MAC address</string>
+    <string name="no_devices_found">No devices found</string>
+    <string name="connected">Connected</string>
+    <string name="connecting">Connecting…</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="error">Error</string>
+    <string name="select_device">Select Device</string>
+    <string name="event_count">Event count</string>
+
+    <!-- Photos -->
+    <string name="view_photos">View Photos</string>
+    <string name="no_photos">No photos</string>
+    <string name="photo_file_not_found">Photo file not found</string>
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
+    <string name="photo_preview_title">Photo Preview</string>
+    <string name="photo_saved">Photo saved</string>
+    <string name="photo_failed">Failed to take photo</string>
+    <string name="file_not_found">Photo file not found</string>
+    <string name="camera_permission_required">Camera permission required</string>
+    <string name="microphone_permission_required">Microphone permission required</string>
+
+    <!-- Timer -->
+    <string name="timer_default">00:00</string>
+
+    <!-- Survey Mode -->
+    <string name="mode_general">General</string>
+    <string name="mode_sdi">SDI</string>
+    <string name="mode_pci">PCI</string>
+    <string name="select_mode">Select Mode</string>
+    <string name="sdi_mode_required">Not in SDI/PCI mode or survey not active</string>
+    <string name="distress_mode_required">SDI or PCI mode required</string>
+
+    <!-- Distress Input -->
+    <string name="distress_type_hint">Distress Type</string>
+    <string name="severity_label">Severity Level</string>
+    <string name="severity_low">Low</string>
+    <string name="severity_medium">Medium</string>
+    <string name="severity_high">High</string>
+    <string name="custom_value_hint">Enter value</string>
+    <string name="add_photo">Add Photo</string>
+    <string name="sdi_average" formatted="false">Average SDI: %d (%s)</string>
+    <string name="distress_saved">Distress data saved</string>
+    <string name="select_distress_type">Please select a distress type first</string>
+    <string name="select_severity">Please select a severity level first</string>
+    <string name="enter_length_area">Enter length or area of distress</string>
+    <string name="invalid_data">Invalid data, please check again</string>
+    <string name="record_voice">Record Voice</string>
+    <string name="recording_failed">Failed to start recording</string>
+    <string name="audio_saved">Recording saved</string>
+    <string name="distress_input_title">Road Distress Input</string>
+    <string name="length_area_label">Length / Area</string>
+    <string name="documentation_label">Documentation</string>
+    <string name="save_distress">Save Distress</string>
+    <string name="lane_width_hint">Lane width (meters)</string>
+
+    <!-- Unit labels -->
+    <string name="unit_length">m (length)</string>
+    <string name="unit_area">m² (area)</string>
     <string name="unit_default">m / m²</string>
 
-    <!-- Quick input SDI -->
+    <!-- Quick presets -->
     <string name="quick_5">5</string>
     <string name="quick_10">10</string>
     <string name="quick_20">20</string>
     <string name="quick_50">50</string>
-
-    <!-- Summary / Export -->
-    <string name="view_details">Lihat Detail</string>
-    <string name="export_gpx">Ekspor GPX</string>
-    <string name="export_csv">Ekspor CSV</string>
-    <string name="export_pdf">Ekspor PDF</string>
-    <string name="export_success">Ekspor Berhasil</string>
-    <string name="export_success_message">File disimpan di: %s</string>
-    <string name="export_failed">Ekspor gagal</string>
-    <string name="delete_session">Hapus Sesi</string>
-    <string name="delete_session_confirm">Data survey ini akan dihapus permanen. Lanjutkan?</string>
-    <string name="session_options">Pilihan Sesi</string>
-    <string name="photo_preview_title">Preview Foto</string>
-    <string name="surveyor_name_hint">Masukkan Nama Surveyor</string>
-    <string name="action_pause">Pause ⏸</string>
-    <!-- Untuk bottom sheet distress -->
-    <string name="distress_input_title">Input Kerusakan Jalan</string>
-
-    <string name="length_area_label">Panjang / Luas</string>
-
     <string name="quick_5_preset">Preset 5</string>
     <string name="quick_10_preset">Preset 10</string>
     <string name="quick_20_preset">Preset 20</string>
     <string name="quick_50_preset">Preset 50</string>
-    <string name="documentation_label">Dokumentasi</string>
 
-    <string name="save_distress">Simpan Kerusakan</string>
-    <string name="mode_pci">PCI</string>
-    <string name="lane_width_hint">Lebar lajur (meter)</string>
-    <string name="distress_mode_required">Mode SDI atau PCI diperlukan</string>
+    <!-- Export / Summary -->
+    <string name="view_details">View Details</string>
+    <string name="export_gpx">Export GPX</string>
+    <string name="export_csv">Export CSV</string>
+    <string name="export_pdf">Export PDF</string>
+    <string name="export_success">Export Successful</string>
+    <string name="export_success_message">File saved at: %s</string>
+    <string name="export_failed">Export failed</string>
+    <string name="delete_session">Delete Session</string>
+    <string name="delete_session_confirm">This survey data will be permanently deleted. Continue?</string>
+    <string name="session_options">Session Options</string>
 
+    <!-- Plurals (if needed via plurals.xml) -->
 </resources>

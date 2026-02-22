@@ -10,7 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.drawerlayout.widget.DrawerLayout
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.NavigationUI
 import dagger.hilt.android.AndroidEntryPoint
@@ -23,7 +22,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var drawerToggle: ActionBarDrawerToggle
 
-    // Daftar semua permission yang dibutuhkan
+    // ===============================
+    // Required Permissions
+    // ===============================
     private val requiredPermissions: Array<String>
         get() {
             val permissions = mutableListOf(
@@ -40,22 +41,26 @@ class MainActivity : AppCompatActivity() {
             return permissions.toTypedArray()
         }
 
-    // Activity Result Launcher untuk meminta multiple permissions
+    // ===============================
+    // Permission Launcher
+    // ===============================
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+
             val deniedPermissions = permissions.filterValues { !it }.keys
 
-            if (deniedPermissions.isEmpty()) {
-                Toast.makeText(this, "All permissions granted", Toast.LENGTH_SHORT).show()
-            } else {
+            if (deniedPermissions.isNotEmpty()) {
                 Toast.makeText(
                     this,
-                    "Permissions denied: ${deniedPermissions.joinToString()}",
+                    "Some permissions are denied. App may not work properly.",
                     Toast.LENGTH_LONG
                 ).show()
             }
         }
 
+    // ===============================
+    // onCreate
+    // ===============================
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -66,17 +71,20 @@ class MainActivity : AppCompatActivity() {
 
         setupNavigation()
         checkAndRequestPermissions()
-        setupOnBackPressed()
+        setupBackPressedHandler()
     }
 
+    // ===============================
+    // Setup Navigation + Drawer
+    // ===============================
     private fun setupNavigation() {
+
         val navHostFragment =
             supportFragmentManager.findFragmentById(R.id.nav_host_fragment)
                     as NavHostFragment
 
         val navController = navHostFragment.navController
 
-        // Drawer toggle
         drawerToggle = ActionBarDrawerToggle(
             this,
             binding.drawerLayout,
@@ -88,27 +96,36 @@ class MainActivity : AppCompatActivity() {
         binding.drawerLayout.addDrawerListener(drawerToggle)
         drawerToggle.syncState()
 
-        // Connect drawer menu with navController
         NavigationUI.setupWithNavController(
             binding.navigationView,
             navController
         )
     }
 
-    // Fungsi untuk mengecek dan meminta permission yang belum diberikan
+    // ===============================
+    // Check & Request Permissions
+    // ===============================
     private fun checkAndRequestPermissions() {
-        val notGranted = requiredPermissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+
+        val notGrantedPermissions = requiredPermissions.filter {
+            ContextCompat.checkSelfPermission(
+                this,
+                it
+            ) != PackageManager.PERMISSION_GRANTED
         }
 
-        if (notGranted.isNotEmpty()) {
-            permissionLauncher.launch(notGranted.toTypedArray())
+        if (notGrantedPermissions.isNotEmpty()) {
+            permissionLauncher.launch(notGrantedPermissions.toTypedArray())
         }
     }
 
-    // Menggunakan OnBackPressedDispatcher untuk menangani back press
-    private fun setupOnBackPressed() {
+    // ===============================
+    // Handle Back Press
+    // ===============================
+    private fun setupBackPressedHandler() {
+
         onBackPressedDispatcher.addCallback(this) {
+
             if (binding.drawerLayout.isDrawerOpen(binding.navigationView)) {
                 binding.drawerLayout.closeDrawer(binding.navigationView)
             } else {

@@ -1,159 +1,243 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:layout_height="match_parent">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Threshold Getaran"
-        android:textSize="18sp"
-        android:textStyle="bold" />
-
-    <com.google.android.material.slider.Slider
-        android:id="@+id/sliderBaik"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:valueFrom="0.1"
-        android:valueTo="0.5"
-        android:stepSize="0.05"
-        app:labelBehavior="floating"
-        android:contentDescription="Threshold Baik" />
+        android:orientation="vertical"
+        android:padding="16dp">
 
-    <TextView
-        android:id="@+id/tvBaik"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Baik: 0.3g" />
-
-    <com.google.android.material.slider.Slider
-        android:id="@+id/sliderSedang"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:valueFrom="0.4"
-        android:valueTo="0.8"
-        android:stepSize="0.05"
-        app:labelBehavior="floating"
-        android:contentDescription="Threshold Sedang" />
-
-    <TextView
-        android:id="@+id/tvSedang"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Sedang: 0.6g" />
-
-    <com.google.android.material.slider.Slider
-        android:id="@+id/sliderRusakRingan"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:valueFrom="0.8"
-        android:valueTo="1.5"
-        android:stepSize="0.05"
-        app:labelBehavior="floating"
-        android:contentDescription="Threshold Rusak Ringan" />
-
-    <TextView
-        android:id="@+id/tvRusakRingan"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Rusak Ringan: 1.0g" />
-
-    <Space
-        android:layout_width="match_parent"
-        android:layout_height="16dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Interval GPS (ms)"
-        android:textSize="18sp"
-        android:textStyle="bold" />
-
-    <com.google.android.material.slider.Slider
-        android:id="@+id/sliderGpsInterval"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:valueFrom="500"
-        android:valueTo="5000"
-        android:stepSize="100"
-        app:labelBehavior="floating"
-        android:contentDescription="Interval GPS" />
-
-    <TextView
-        android:id="@+id/tvGpsInterval"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="1000 ms" />
-
-    <Space
-        android:layout_width="match_parent"
-        android:layout_height="16dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Unit Jarak"
-        android:textSize="18sp"
-        android:textStyle="bold" />
-
-    <RadioGroup
-        android:id="@+id/radioGroupUnit"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <RadioButton
-            android:id="@+id/radioKm"
+        <!-- ══════════════════════════════════════════
+             LANGUAGE
+             ══════════════════════════════════════════ -->
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="km"
-            android:checked="true" />
+            android:text="@string/settings_section_language"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
 
-        <RadioButton
-            android:id="@+id/radioMi"
+        <RadioGroup
+            android:id="@+id/radioGroupLanguage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/radioLangEn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/lang_english"
+                android:layout_marginEnd="16dp"
+                android:checked="true" />
+
+            <RadioButton
+                android:id="@+id/radioLangId"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/lang_indonesian" />
+
+        </RadioGroup>
+
+        <TextView
+            android:id="@+id/tvLangNote"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="mi" />
-    </RadioGroup>
+            android:text="@string/lang_restart_note"
+            android:textSize="11sp"
+            android:textColor="@color/divider"
+            android:layout_marginTop="2dp"
+            android:visibility="gone" />
 
-    <Space
-        android:layout_width="match_parent"
-        android:layout_height="16dp" />
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginVertical="16dp" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Tema"
-        android:textSize="18sp"
-        android:textStyle="bold" />
-
-    <RadioGroup
-        android:id="@+id/radioGroupTheme"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <RadioButton
-            android:id="@+id/radioLight"
+        <!-- ══════════════════════════════════════════
+             VIBRATION THRESHOLD
+             ══════════════════════════════════════════ -->
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Light" />
+            android:text="@string/settings_section_vibration"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
 
-        <RadioButton
-            android:id="@+id/radioDark"
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sliderBaik"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:valueFrom="0.1"
+            android:valueTo="0.5"
+            android:stepSize="0.05"
+            app:labelBehavior="floating"
+            android:contentDescription="@string/threshold_baik_label" />
+
+        <TextView
+            android:id="@+id/tvBaik"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Dark" />
+            android:text="@string/threshold_baik_label" />
 
-        <RadioButton
-            android:id="@+id/radioSystem"
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sliderSedang"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:valueFrom="0.4"
+            android:valueTo="0.8"
+            android:stepSize="0.05"
+            app:labelBehavior="floating"
+            android:contentDescription="@string/threshold_sedang_label" />
+
+        <TextView
+            android:id="@+id/tvSedang"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="System"
-            android:checked="true" />
-    </RadioGroup>
+            android:text="@string/threshold_sedang_label" />
 
-</LinearLayout>
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sliderRusakRingan"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:valueFrom="0.8"
+            android:valueTo="1.5"
+            android:stepSize="0.05"
+            app:labelBehavior="floating"
+            android:contentDescription="@string/threshold_rusak_label" />
+
+        <TextView
+            android:id="@+id/tvRusakRingan"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/threshold_rusak_label" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginVertical="16dp" />
+
+        <!-- ══════════════════════════════════════════
+             GPS INTERVAL
+             ══════════════════════════════════════════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_section_gps"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sliderGpsInterval"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:valueFrom="500"
+            android:valueTo="5000"
+            android:stepSize="100"
+            app:labelBehavior="floating"
+            android:contentDescription="@string/settings_section_gps" />
+
+        <TextView
+            android:id="@+id/tvGpsInterval"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/gps_interval_label" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginVertical="16dp" />
+
+        <!-- ══════════════════════════════════════════
+             DISTANCE UNIT
+             ══════════════════════════════════════════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_section_unit"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <RadioGroup
+            android:id="@+id/radioGroupUnit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/radioKm"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="km"
+                android:checked="true"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/radioMi"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="mi" />
+        </RadioGroup>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginVertical="16dp" />
+
+        <!-- ══════════════════════════════════════════
+             THEME
+             ══════════════════════════════════════════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_section_theme"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <RadioGroup
+            android:id="@+id/radioGroupTheme"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/radioLight"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/theme_light"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/radioDark"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/theme_dark"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/radioSystem"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/theme_system"
+                android:checked="true" />
+        </RadioGroup>
+
+        <!-- Bottom padding -->
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="24dp" />
+
+    </LinearLayout>
+</ScrollView>

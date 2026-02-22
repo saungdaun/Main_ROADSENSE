@@ -2,81 +2,127 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- ============================= -->
+    <!-- NETWORK -->
+    <!-- ============================= -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- PERMISSIONS -->
-    <!-- Location -->
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- ============================= -->
+    <!-- LOCATION -->
+    <!-- ============================= -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Background location (Android 10+) hanya kalau benar-benar perlu -->
-    <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> -->
-
-    <!-- Camera -->
+    <!-- ============================= -->
+    <!-- CAMERA & AUDIO -->
+    <!-- ============================= -->
     <uses-permission android:name="android.permission.CAMERA" />
-
-    <!-- Microphone -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- Foreground Service -->
+    <!-- ============================= -->
+    <!-- FOREGROUND SERVICE -->
+    <!-- ============================= -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Android 14+ wajib deklarasi type -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
-    <!-- Android 13+ Notification -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- ============================= -->
+    <!-- NOTIFICATIONS (Android 13+) -->
+    <!-- ============================= -->
+    <uses-permission
+        android:name="android.permission.POST_NOTIFICATIONS"
+        tools:targetApi="33" />
 
-    <!-- Internet untuk tile map online (osmdroid) -->
-    <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Wake lock opsional -->
+    <!-- ============================= -->
+    <!-- WAKE LOCK -->
+    <!-- ============================= -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Hardware features -->
-    <!-- Set required=false biar lebih banyak device bisa install -->
-    <uses-feature android:name="android.hardware.camera" android:required="true" />
-    <uses-feature android:name="android.hardware.microphone" android:required="true" />
-    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <!-- ============================= -->
+    <!-- BLUETOOTH (Android 12+) -->
+    <!-- ============================= -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="31" />
 
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_CONNECT"
+        tools:targetApi="31" />
+
+    <!-- Optional legacy support -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <!-- ============================= -->
+    <!-- HARDWARE FEATURES -->
+    <!-- ============================= -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="true" />
+
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="true" />
+
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false" />
+
+    <!-- ============================= -->
+    <!-- APPLICATION -->
+    <!-- ============================= -->
     <application
         android:name=".RoadSenseApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="RoadSense Basic"
+        android:label="@string/app_name"
         android:theme="@style/Theme.RoadSenseBasic"
         android:supportsRtl="true"
-        android:requestLegacyExternalStorage="false"
         android:usesCleartextTraffic="false"
+        android:localeConfig="@xml/locales_config"
+        android:enableOnBackInvokedCallback="true"
         tools:targetApi="34">
 
-        <!-- Main Activity -->
+        <!-- ============================= -->
+        <!-- MAIN ACTIVITY -->
+        <!-- ============================= -->
         <activity
             android:name=".ui.main.MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:screenOrientation="portrait">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
         </activity>
 
-        <!-- Foreground Service untuk Survey -->
+        <!-- ============================= -->
+        <!-- FOREGROUND SERVICE -->
+        <!-- ============================= -->
         <service
             android:name=".service.SurveyForegroundService"
             android:exported="false"
             android:foregroundServiceType="location|camera|microphone" />
 
-        <!-- FileProvider -->
+        <!-- ============================= -->
+        <!-- FILE PROVIDER -->
+        <!-- ============================= -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
+
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />

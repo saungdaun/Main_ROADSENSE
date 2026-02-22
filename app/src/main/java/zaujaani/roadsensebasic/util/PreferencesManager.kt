@@ -19,79 +19,107 @@ class PreferencesManager @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) {
     companion object {
-        // Keys untuk threshold getaran
-        val THRESHOLD_BAIK = floatPreferencesKey("threshold_baik")
-        val THRESHOLD_SEDANG = floatPreferencesKey("threshold_sedang")
+        val THRESHOLD_BAIK        = floatPreferencesKey("threshold_baik")
+        val THRESHOLD_SEDANG      = floatPreferencesKey("threshold_sedang")
         val THRESHOLD_RUSAK_RINGAN = floatPreferencesKey("threshold_rusak_ringan")
-        // Interval GPS (ms)
-        val GPS_INTERVAL = intPreferencesKey("gps_interval")
-        // Unit jarak (km/mi)
-        val DISTANCE_UNIT = stringPreferencesKey("distance_unit")
-        // Tema (light/dark)
-        val THEME = stringPreferencesKey("theme")
+        val GPS_INTERVAL          = intPreferencesKey("gps_interval")
+        val DISTANCE_UNIT         = stringPreferencesKey("distance_unit")
+        val THEME                 = stringPreferencesKey("theme")
+
+        // Language key — "en" = English (default), "id" = Bahasa Indonesia
+        val LANGUAGE              = stringPreferencesKey("language")
+
+        // Supported language tags (BCP 47)
+        const val LANG_ENGLISH    = "en"
+        const val LANG_INDONESIAN = "id"
     }
 
-    // Default values
-    private val defaultThresholdBaik = 0.3f
-    private val defaultThresholdSedang = 0.6f
-    private val defaultThresholdRusakRingan = 1.0f
-    private val defaultGpsInterval = 1000
-    private val defaultDistanceUnit = "km"
-    private val defaultTheme = "system"
+    // ── Defaults ──────────────────────────────────────────────────────────
+    private val defaultThresholdBaik         = 0.3f
+    private val defaultThresholdSedang       = 0.6f
+    private val defaultThresholdRusakRingan  = 1.0f
+    private val defaultGpsInterval           = 1000
+    private val defaultDistanceUnit          = "km"
+    private val defaultTheme                 = "system"
+    private val defaultLanguage              = LANG_ENGLISH   // English is default
 
-    // Flow untuk threshold
+    // ── Flows ─────────────────────────────────────────────────────────────
+
     val thresholdBaik: Flow<Float> = context.dataStore.data
-        .map { preferences -> preferences[THRESHOLD_BAIK] ?: defaultThresholdBaik }
+        .map { it[THRESHOLD_BAIK] ?: defaultThresholdBaik }
 
     val thresholdSedang: Flow<Float> = context.dataStore.data
-        .map { preferences -> preferences[THRESHOLD_SEDANG] ?: defaultThresholdSedang }
+        .map { it[THRESHOLD_SEDANG] ?: defaultThresholdSedang }
 
     val thresholdRusakRingan: Flow<Float> = context.dataStore.data
-        .map { preferences -> preferences[THRESHOLD_RUSAK_RINGAN] ?: defaultThresholdRusakRingan }
+        .map { it[THRESHOLD_RUSAK_RINGAN] ?: defaultThresholdRusakRingan }
 
     val gpsInterval: Flow<Int> = context.dataStore.data
-        .map { preferences -> preferences[GPS_INTERVAL] ?: defaultGpsInterval }
+        .map { it[GPS_INTERVAL] ?: defaultGpsInterval }
 
     val distanceUnit: Flow<String> = context.dataStore.data
-        .map { preferences -> preferences[DISTANCE_UNIT] ?: defaultDistanceUnit }
+        .map { it[DISTANCE_UNIT] ?: defaultDistanceUnit }
 
     val theme: Flow<String> = context.dataStore.data
-        .map { preferences -> preferences[THEME] ?: defaultTheme }
+        .map { it[THEME] ?: defaultTheme }
 
-    // Fungsi untuk menyimpan
-    suspend fun setThresholdBaik(value: Float) {
-        context.dataStore.edit { preferences ->
-            preferences[THRESHOLD_BAIK] = value
+    /** "en" or "id" */
+    val language: Flow<String> = context.dataStore.data
+        .map { it[LANGUAGE] ?: defaultLanguage }
+
+    /**
+     * One-shot synchronous read for language — needed at Application/Activity startup
+     * before coroutines are set up.
+     * Uses blocking runBlocking — safe to call only from onCreate before UI inflates.
+     */
+    fun getLanguageSync(): String {
+        return try {
+            var lang = defaultLanguage
+            // Read from SharedPreferences as a fast sync fallback
+            val prefs = context.getSharedPreferences("roadsense_lang_cache", Context.MODE_PRIVATE)
+            prefs.getString("language", defaultLanguage) ?: defaultLanguage
+        } catch (e: Exception) {
+            defaultLanguage
         }
+    }
+
+    // ── Setters ───────────────────────────────────────────────────────────
+
+    suspend fun setThresholdBaik(value: Float) {
+        context.dataStore.edit { it[THRESHOLD_BAIK] = value }
     }
 
     suspend fun setThresholdSedang(value: Float) {
-        context.dataStore.edit { preferences ->
-            preferences[THRESHOLD_SEDANG] = value
-        }
+        context.dataStore.edit { it[THRESHOLD_SEDANG] = value }
     }
 
     suspend fun setThresholdRusakRingan(value: Float) {
-        context.dataStore.edit { preferences ->
-            preferences[THRESHOLD_RUSAK_RINGAN] = value
-        }
+        context.dataStore.edit { it[THRESHOLD_RUSAK_RINGAN] = value }
     }
 
     suspend fun setGpsInterval(value: Int) {
-        context.dataStore.edit { preferences ->
-            preferences[GPS_INTERVAL] = value
-        }
+        context.dataStore.edit { it[GPS_INTERVAL] = value }
     }
 
     suspend fun setDistanceUnit(value: String) {
-        context.dataStore.edit { preferences ->
-            preferences[DISTANCE_UNIT] = value
-        }
+        context.dataStore.edit { it[DISTANCE_UNIT] = value }
     }
 
     suspend fun setTheme(value: String) {
-        context.dataStore.edit { preferences ->
-            preferences[THEME] = value
-        }
+        context.dataStore.edit { it[THEME] = value }
+    }
+
+    /**
+     * Save language preference.
+     * Also writes to a SharedPreferences cache for fast sync reads at startup.
+     * @param langTag "en" or "id"
+     */
+    suspend fun setLanguage(langTag: String) {
+        context.dataStore.edit { it[LANGUAGE] = langTag }
+        // Cache in SharedPreferences for sync startup read
+        context.getSharedPreferences("roadsense_lang_cache", Context.MODE_PRIVATE)
+            .edit()
+            .putString("language", langTag)
+            .apply()
     }
 }

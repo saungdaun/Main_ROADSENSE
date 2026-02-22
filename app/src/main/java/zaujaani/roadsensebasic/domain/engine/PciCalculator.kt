@@ -2,9 +2,6 @@ package zaujaani.roadsensebasic.domain.engine
 
 import zaujaani.roadsensebasic.data.local.entity.PCIDistressType
 import zaujaani.roadsensebasic.data.local.entity.Severity
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.pow
 
 /**
  * PCICalculator — ASTM D6433-11
