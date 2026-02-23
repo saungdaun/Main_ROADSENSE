@@ -1,18 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     bottom_sheet_distress.xml
-    Layout untuk DistressBottomSheet (SDI mode)
+    Dipakai oleh: DistressBottomSheet (SDI) DAN PciDistressBottomSheet (PCI)
 
-    Elemen:
-    - Dropdown: Jenis Kerusakan, Tingkat Keparahan
-    - tvSurveyorGuide: panduan pengukuran per jenis kerusakan (BARU)
-    - etLengthArea: input panjang / luas
-    - tvUnitLabel: satuan (m atau m²) — update otomatis
-    - 4 tombol preset cepat (label update otomatis per jenis)
-    - Foto & Voice recorder
-    - Thumbnail foto preview
-    - etNotes: catatan tambahan
-    - btnSave: simpan
+    PERUBAHAN vs versi sebelumnya:
+    - 4 quick button (btnQuick5 / btnQuick10 / btnQuick20 / btnQuick50) → DIHAPUS
+    - Diganti: Dropdown preset nilai (actvQuantityPreset)
+    - Ditambah: Field custom opsional (etCustomQuantity) di bawah dropdown
+    - Alur input: pilih dari dropdown → nilai terisi otomatis
+                  atau ketik di field custom → override nilai dropdown
+    - Field etLengthArea DIHAPUS (diganti actvQuantityPreset + etCustomQuantity)
 -->
 <ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -70,7 +67,6 @@
                 android:layout_height="wrap_content"
                 android:inputType="none"
                 android:focusable="false"
-                android:hint="Jenis Kerusakan"
                 tools:text="Lubang" />
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -109,27 +105,26 @@
                 android:layout_height="wrap_content"
                 android:inputType="none"
                 android:focusable="false"
-                android:hint="Tingkat Keparahan"
                 tools:text="Sedang" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- ══════════════════════════════════════════════
-             SECTION 2: Input ukuran
+             SECTION 2: Panjang / Luas / Jumlah
              ══════════════════════════════════════════════ -->
 
-        <!-- Label unit (m atau m², update otomatis) -->
+        <!-- Header row: label + chip satuan -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="6dp">
+            android:layout_marginBottom="8dp">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Panjang / Luas"
+                android:text="Panjang / Luas / Jumlah"
                 android:textSize="13sp"
                 android:textStyle="bold"
                 android:textColor="@color/text_primary" />
@@ -148,12 +143,66 @@
                 tools:text="m²" />
         </LinearLayout>
 
-        <!-- Input angka -->
+        <!-- ── Dropdown Preset Nilai (BARU — ganti 4 tombol cepat) ── -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilQuantityPreset"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:hint="Nilai (contoh: 0.25)"
+            android:layout_marginBottom="6dp"
+            android:hint="Pilih nilai cepat"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            app:boxCornerRadiusTopStart="10dp"
+            app:boxCornerRadiusTopEnd="10dp"
+            app:boxCornerRadiusBottomStart="10dp"
+            app:boxCornerRadiusBottomEnd="10dp"
+            app:startIconDrawable="@drawable/ic_speed"
+            app:startIconTint="@color/primary">
+
+            <AutoCompleteTextView
+                android:id="@+id/actvQuantityPreset"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="none"
+                android:focusable="false"
+                tools:text="0.25 m²" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ── Divider antara preset dan custom ── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="@color/divider" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="10dp"
+                android:text="atau isi manual"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="@color/divider" />
+        </LinearLayout>
+
+        <!-- ── Field Custom Opsional (BARU) ── -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilCustomQuantity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:hint="Nilai lain (opsional)"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             app:boxCornerRadiusTopStart="10dp"
             app:boxCornerRadiusTopEnd="10dp"
@@ -161,61 +210,13 @@
             app:boxCornerRadiusBottomEnd="10dp">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etLengthArea"
+                android:id="@+id/etCustomQuantity"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="numberDecimal"
-                android:imeOptions="actionDone" />
+                android:imeOptions="actionDone"/>
+
         </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Tombol preset cepat (4 tombol, label update per jenis) -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="20dp">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnQuick5"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:text="5m"
-                android:textSize="11sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnQuick10"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginHorizontal="2dp"
-                android:text="10m"
-                android:textSize="11sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnQuick20"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginHorizontal="2dp"
-                android:text="20m"
-                android:textSize="11sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnQuick50"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:text="50m"
-                android:textSize="11sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-        </LinearLayout>
 
         <!-- ══════════════════════════════════════════════
              SECTION 3: Foto & Suara
@@ -236,7 +237,6 @@
             android:orientation="horizontal"
             android:layout_marginBottom="10dp">
 
-            <!-- Tombol Foto -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAddPhoto"
                 android:layout_width="0dp"
@@ -248,7 +248,6 @@
                 app:iconGravity="start"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
-            <!-- Tombol Voice Recording -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnVoice"
                 android:layout_width="0dp"
@@ -262,7 +261,7 @@
 
         </LinearLayout>
 
-        <!-- Thumbnail foto preview (muncul setelah foto diambil) -->
+        <!-- Thumbnail foto preview -->
         <ImageView
             android:id="@+id/ivPhotoThumb"
             android:layout_width="match_parent"

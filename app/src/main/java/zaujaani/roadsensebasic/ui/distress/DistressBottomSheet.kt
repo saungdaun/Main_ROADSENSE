@@ -70,6 +70,8 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
     // ── State ─────────────────────────────────────────────────────────────
     private var selectedType: DistressType? = null
     private var selectedSeverity: Severity? = null
+    private var selectedPresetValue: Double? = null  // nilai dari dropdown preset
+
     private var currentPhotoPath: String? = null
     private var currentAudioFile: File? = null
 
@@ -164,7 +166,8 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
 
         setupDropdowns()
         setupListeners()
-        refreshQuickButtons()
+        // Preset dropdown dimuat ulang saat jenis kerusakan dipilih (refreshQuantityPreset)
+        // Tidak perlu inisialisasi preset di sini karena belum ada jenis yang dipilih.
 
         viewModel.saveResult.observe(viewLifecycleOwner) { result ->
             when (result) {
@@ -193,6 +196,7 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
         binding.actvDistressType.setAdapter(typeAdapter)
         binding.actvDistressType.setOnItemClickListener { _, _, position, _ ->
             selectedType = DistressType.entries[position]
+            selectedPresetValue = null  // reset preset lama saat ganti jenis
             onDistressTypeSelected(selectedType!!)
         }
 
@@ -211,27 +215,39 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
         binding.tvUnitLabel.text = type.unit
         binding.tvSurveyorGuide.text = type.getSurveyorGuide()
         binding.tvSurveyorGuide.visibility = View.VISIBLE
-        binding.etLengthArea.text?.clear()
-        refreshQuickButtons()
+        // Reset pilihan sebelumnya
+        binding.actvQuantityPreset.setText("", false)
+        binding.etCustomQuantity.text?.clear()
+        refreshQuantityPreset()
     }
 
-    private fun refreshQuickButtons() {
-        val presets = selectedType?.getQuickPresets() ?: listOf(
+    /**
+     * Isi ulang dropdown preset sesuai jenis kerusakan yang dipilih.
+     * Label preset mencantumkan satuan agar surveyor tidak perlu melihat chip satuan.
+     * Contoh SDI: "5 m", "10 m", "0.25 m²"
+     */
+    private fun refreshQuantityPreset() {
+        val type = selectedType
+        val unit = type?.unit ?: ""
+        val presets = type?.getQuickPresets() ?: listOf(
             "5" to 5.0, "10" to 10.0, "25" to 25.0, "50" to 50.0
         )
-        val buttons = listOf(
-            binding.btnQuick5,
-            binding.btnQuick10,
-            binding.btnQuick20,
-            binding.btnQuick50
-        )
-        presets.forEachIndexed { index, (label, value) ->
-            buttons.getOrNull(index)?.apply {
-                text = label
-                setOnClickListener {
-                    binding.etLengthArea.setText(value.toString())
-                }
-            }
+
+        // Label dropdown: "0.25 m²", "0.50 m²", dst — termasuk satuan agar jelas
+        val labels = presets.map { (label, _) ->
+            if (unit.isNotBlank() && !label.contains(unit)) "$label $unit" else label
+        }
+
+        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, labels)
+        binding.actvQuantityPreset.setAdapter(adapter)
+
+        binding.actvQuantityPreset.setOnItemClickListener { _, _, position, _ ->
+            val value = presets.getOrNull(position)?.second ?: return@setOnItemClickListener
+            // Saat preset dipilih → kosongkan custom field agar tidak konflik
+            binding.etCustomQuantity.text?.clear()
+            selectedPresetValue = value
+            // Tampilkan konfirmasi singkat di hint custom field
+            binding.tilCustomQuantity.hint = "Terpilih: ${presets[position].first} $unit  (atau isi nilai lain)"
         }
     }
 
@@ -382,7 +398,6 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
     private fun saveDistress() {
         val typeStr     = binding.actvDistressType.text.toString().trim()
         val severityStr = binding.actvSeverity.text.toString().trim()
-        val quantityStr = binding.etLengthArea.text.toString().trim()
         val notes       = binding.etNotes.text?.toString()?.trim() ?: ""
 
         if (typeStr.isBlank()) {
@@ -391,20 +406,27 @@ class DistressBottomSheet : BottomSheetDialogFragment() {
         if (severityStr.isBlank()) {
             showToast(getString(R.string.select_severity)); return
         }
-        if (quantityStr.isBlank()) {
-            showToast(getString(R.string.enter_length_area)); return
-        }
 
         val type     = DistressType.entries.find { it.displayName == typeStr }
         val severity = Severity.entries.find { it.displayName == severityStr }
-        val quantity = quantityStr.toDoubleOrNull()
 
-        if (type == null || severity == null || quantity == null || quantity <= 0) {
+        if (type == null || severity == null) {
             showToast(getString(R.string.invalid_data)); return
         }
 
-        if (isRecording) stopRecording()
+        // Prioritas: custom field → preset dropdown
+        val customStr = binding.etCustomQuantity.text?.toString()?.trim() ?: ""
+        val quantity: Double? = if (customStr.isNotBlank()) {
+            customStr.toDoubleOrNull()
+        } else {
+            selectedPresetValue
+        }
 
+        if (quantity == null || quantity <= 0) {
+            showToast("Pilih atau isi nilai panjang/luas terlebih dahulu"); return
+        }
+
+        if (isRecording) stopRecording()
         binding.btnSave.isEnabled = false
 
         viewModel.saveDistress(

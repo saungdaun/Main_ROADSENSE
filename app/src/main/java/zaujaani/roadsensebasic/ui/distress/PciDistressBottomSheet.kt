@@ -68,6 +68,7 @@ class PciDistressBottomSheet : BottomSheetDialogFragment() {
     // ── State ─────────────────────────────────────────────────────────────
     private var selectedType: PCIDistressType? = null
     private var selectedSeverity: Severity? = null
+    private var selectedPresetValue: Double? = null  // nilai dari dropdown preset
     private var currentPhotoPath: String? = null
     private var currentAudioPath: String? = null
 
@@ -151,7 +152,7 @@ class PciDistressBottomSheet : BottomSheetDialogFragment() {
 
         setupDropdowns()
         setupListeners()
-        refreshQuickButtons()
+        // Preset dropdown dimuat saat jenis kerusakan dipilih (refreshQuantityPreset)
 
         viewModel.saveResult.observe(viewLifecycleOwner) { result ->
             when (result) {
@@ -180,6 +181,7 @@ class PciDistressBottomSheet : BottomSheetDialogFragment() {
         binding.actvDistressType.setAdapter(typeAdapter)
         binding.actvDistressType.setOnItemClickListener { _, _, position, _ ->
             selectedType = PCIDistressType.entries[position]
+            selectedPresetValue = null  // reset preset lama saat ganti jenis
             onDistressTypeSelected(selectedType!!)
         }
 
@@ -198,27 +200,39 @@ class PciDistressBottomSheet : BottomSheetDialogFragment() {
         binding.tvUnitLabel.text = type.unitLabel
         binding.tvSurveyorGuide.text = type.getSurveyorGuide()
         binding.tvSurveyorGuide.visibility = View.VISIBLE
-        binding.etLengthArea.text?.clear()
-        refreshQuickButtons()
+        // Reset pilihan sebelumnya
+        binding.actvQuantityPreset.setText("", false)
+        binding.etCustomQuantity.text?.clear()
+        selectedPresetValue = null
+        refreshQuantityPreset()
     }
 
-    private fun refreshQuickButtons() {
-        val presets = selectedType?.getQuickPresets() ?: listOf(
+    /**
+     * Isi ulang dropdown preset sesuai jenis kerusakan PCI yang dipilih.
+     *
+     * PCI per 50m → presets relatif lebih kecil dari SDI (per 100m).
+     * Label mencantumkan satuan eksplisit agar surveyor tidak perlu baca chip.
+     * Contoh: "1 m²", "5 m²", "10 lubang"
+     */
+    private fun refreshQuantityPreset() {
+        val type = selectedType
+        val unit = type?.unitLabel ?: ""
+        val presets = type?.getQuickPresets() ?: listOf(
             "1" to 1.0, "5" to 5.0, "10" to 10.0, "20" to 20.0
         )
-        val buttons = listOf(
-            binding.btnQuick5,
-            binding.btnQuick10,
-            binding.btnQuick20,
-            binding.btnQuick50
-        )
-        presets.forEachIndexed { index, (label, value) ->
-            buttons.getOrNull(index)?.apply {
-                text = label
-                setOnClickListener {
-                    binding.etLengthArea.setText(value.toString())
-                }
-            }
+
+        val labels = presets.map { (label, _) ->
+            if (unit.isNotBlank() && !label.contains(unit)) "$label $unit" else label
+        }
+
+        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, labels)
+        binding.actvQuantityPreset.setAdapter(adapter)
+
+        binding.actvQuantityPreset.setOnItemClickListener { _, _, position, _ ->
+            val value = presets.getOrNull(position)?.second ?: return@setOnItemClickListener
+            binding.etCustomQuantity.text?.clear()
+            selectedPresetValue = value
+            binding.tilCustomQuantity.hint = "Terpilih: ${presets[position].first} $unit  (atau isi nilai lain)"
         }
     }
 
@@ -259,10 +273,9 @@ class PciDistressBottomSheet : BottomSheetDialogFragment() {
     // ── Save Distress ─────────────────────────────────────────────────────
 
     private fun saveDistress() {
-        val type        = selectedType
-        val severity    = selectedSeverity
-        val quantityStr = binding.etLengthArea.text.toString().trim()
-        val notes       = binding.etNotes.text.toString().trim()
+        val type     = selectedType
+        val severity = selectedSeverity
+        val notes    = binding.etNotes.text.toString().trim()
 
         if (type == null) {
             Toast.makeText(requireContext(), R.string.select_distress_type, Toast.LENGTH_SHORT).show()
@@ -272,13 +285,17 @@ class PciDistressBottomSheet : BottomSheetDialogFragment() {
             Toast.makeText(requireContext(), R.string.select_severity, Toast.LENGTH_SHORT).show()
             return
         }
-        if (quantityStr.isBlank()) {
-            Toast.makeText(requireContext(), R.string.enter_length_area, Toast.LENGTH_SHORT).show()
-            return
+
+        // Prioritas: custom field → preset dropdown
+        val customStr = binding.etCustomQuantity.text?.toString()?.trim() ?: ""
+        val quantity: Double? = if (customStr.isNotBlank()) {
+            customStr.toDoubleOrNull()
+        } else {
+            selectedPresetValue
         }
-        val quantity = quantityStr.toDoubleOrNull()
+
         if (quantity == null || quantity <= 0) {
-            Toast.makeText(requireContext(), R.string.invalid_data, Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Pilih atau isi nilai terlebih dahulu", Toast.LENGTH_SHORT).show()
             return
         }
 

@@ -389,41 +389,75 @@ class SurveyEngine @Inject constructor(
     // DISTRESS — SDI
     // ══════════════════════════════════════════════════════════════════════
 
-    fun addDistressItem(
+    /**
+     * Simpan item kerusakan SDI ke database.
+     *
+     * FIX KRITIS — silent drop sebelumnya:
+     * - `lastLocation == null`  → surveyor belum bergerak setelah start session
+     * - `currentSegmentId == null` → belum jalan 100m, segment belum dibuat otomatis
+     * Keduanya menyebabkan data + foto tidak tersimpan sama sekali tanpa notifikasi error.
+     *
+     * Perbaikan:
+     * 1. `lastLocation == null` → gunakan LocationData(0,0) sebagai fallback
+     * 2. `currentSegmentId == null` → auto-create segmen 0 (STA 0+000–0+100)
+     * 3. Fungsi kini `suspend` + return `Boolean` agar ViewModel bisa cek keberhasilan
+     */
+    suspend fun addDistressItem(
         type: DistressType,
         severity: Severity,
         lengthOrArea: Double,
         photoPath: String = "",
         audioPath: String = "",
         notes: String? = null
-    ) {
-        if (currentMode != SurveyMode.SDI) return
-        val location  = lastLocation ?: return
-        val segmentId = currentSegmentId ?: return
-        val sessionId = currentSessionId ?: return
+    ): Boolean {
+        if (currentMode != SurveyMode.SDI) return false
+        val sessionId = currentSessionId ?: return false
 
-        val item = DistressItem(
-            segmentId    = segmentId,
-            sessionId    = sessionId,
-            type         = type,
-            severity     = severity,
-            lengthOrArea = lengthOrArea,
-            photoPath    = photoPath,
-            audioPath    = audioPath,
-            gpsLat       = location.latitude,
-            gpsLng       = location.longitude,
-            sta          = formatSta(currentDistanceValue.toInt()),
-            notes        = notes ?: "",
-            createdAt    = System.currentTimeMillis()
+        // FIX: Jangan tolak karena belum ada GPS fix — gunakan fallback 0,0
+        val location = lastLocation ?: LocationData(
+            latitude = 0.0, longitude = 0.0, altitude = 0.0,
+            speed = 0f, accuracy = 999f
         )
-        engineScope.launch {
-            try {
-                surveyRepository.insertDistressItem(item)
-                val items = surveyRepository.getDistressForSegmentOnce(segmentId)
-                val sdi   = sdiCalculator.calculateSegmentSDI(items, segmentLength = SEGMENT_LENGTH)
-            } catch (e: Exception) {
-                Timber.e(e, "addDistressItem error")
-            }
+
+        // FIX: Auto-create segmen 0 jika belum ada (surveyor belum bergerak 100m)
+        val segmentId: Long = currentSegmentId ?: run {
+            val seg = SegmentSdi(
+                sessionId    = sessionId,
+                segmentIndex = 0,
+                startSta     = formatSta(0),
+                endSta       = formatSta(SEGMENT_LENGTH.toInt()),
+                createdAt    = System.currentTimeMillis()
+            )
+            val newId = surveyRepository.insertSegmentSdi(seg)
+            currentSegmentIndex = 0
+            currentSegmentId    = newId
+            Timber.d("Auto-created SDI segment 0 for sessionId=$sessionId")
+            newId
+        }
+
+        return try {
+            val item = DistressItem(
+                segmentId    = segmentId,
+                sessionId    = sessionId,
+                type         = type,
+                severity     = severity,
+                lengthOrArea = lengthOrArea,
+                photoPath    = photoPath,
+                audioPath    = audioPath,
+                gpsLat       = location.latitude,
+                gpsLng       = location.longitude,
+                sta          = formatSta(currentDistanceValue.toInt()),
+                notes        = notes ?: "",
+                createdAt    = System.currentTimeMillis()
+            )
+            surveyRepository.insertDistressItem(item)
+            val items = surveyRepository.getDistressForSegmentOnce(segmentId)
+            sdiCalculator.calculateSegmentSDI(items, segmentLength = SEGMENT_LENGTH)
+            Timber.d("DistressItem saved: type=${type.name} seg=$segmentId photo=${photoPath.isNotBlank()}")
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "addDistressItem error")
+            false
         }
     }
 
@@ -431,54 +465,92 @@ class SurveyEngine @Inject constructor(
     // DISTRESS — PCI
     // ══════════════════════════════════════════════════════════════════════
 
-    fun addPciDistressItem(
+    /**
+     * Simpan item kerusakan PCI ke database.
+     *
+     * FIX KRITIS — silent drop sebelumnya:
+     * - `lastLocation == null`      → belum ada GPS fix setelah start session
+     * - `currentPciSegmentId == null` → belum jalan 50m, segment belum dibuat otomatis
+     *
+     * Perbaikan:
+     * 1. `lastLocation == null` → LocationData(0,0) sebagai fallback
+     * 2. `currentPciSegmentId == null` → auto-create segmen PCI 0 (STA 0+000–0+050)
+     * 3. Return `Boolean` agar ViewModel bisa propagate error ke UI
+     */
+    suspend fun addPciDistressItem(
         type: PCIDistressType,
         severity: Severity,
         quantity: Double,
         photoPath: String = "",
         audioPath: String = "",
         notes: String = ""
-    ) {
-        if (currentMode != SurveyMode.PCI) return
-        val location  = lastLocation ?: return
-        val segmentId = currentPciSegmentId ?: return
-        val sessionId = currentSessionId ?: return
+    ): Boolean {
+        if (currentMode != SurveyMode.PCI) return false
+        val sessionId = currentSessionId ?: return false
 
-        engineScope.launch {
-            try {
-                val segment    = surveyRepository.getSegmentPciById(segmentId)
-                val sampleArea = segment?.sampleAreaM2 ?: (SEGMENT_LENGTH_PCI * laneWidthM)
-                val density    = (quantity / sampleArea) * 100.0
+        // FIX: Fallback location saat GPS belum ada fix
+        val location = lastLocation ?: LocationData(
+            latitude = 0.0, longitude = 0.0, altitude = 0.0,
+            speed = 0f, accuracy = 999f
+        )
 
-                val dvResult = pciCalculator.calculate(
-                    distresses   = listOf(PCICalculator.DistressInput(type, severity, quantity, sampleArea)),
-                    sampleAreaM2 = sampleArea
-                )
-                val dv = dvResult.distressBreakdown.firstOrNull()?.deductValue ?: 0.0
+        // FIX: Auto-create segmen PCI 0 jika belum ada
+        val segmentId: Long = currentPciSegmentId ?: run {
+            val sampleArea = SEGMENT_LENGTH_PCI * laneWidthM
+            val seg = SegmentPci(
+                sessionId      = sessionId,
+                segmentIndex   = 0,
+                startSta       = formatSta(0),
+                endSta         = formatSta(SEGMENT_LENGTH_PCI.toInt()),
+                startLat       = location.latitude,
+                startLng       = location.longitude,
+                segmentLengthM = SEGMENT_LENGTH_PCI,
+                laneWidthM     = laneWidthM,
+                sampleAreaM2   = sampleArea,
+                createdAt      = System.currentTimeMillis(),
+                updatedAt      = System.currentTimeMillis()
+            )
+            val newId = surveyRepository.insertSegmentPci(seg)
+            currentPciSegmentIndex = 0
+            currentPciSegmentId    = newId
+            Timber.d("Auto-created PCI segment 0 for sessionId=$sessionId sampleArea=$sampleArea")
+            newId
+        }
 
-                val item = PCIDistressItem(
-                    segmentId   = segmentId,
-                    sessionId   = sessionId,
-                    type        = type,
-                    severity    = severity,
-                    quantity    = quantity,
-                    notes       = notes,
-                    density     = density,
-                    deductValue = dv,
-                    photoPath   = photoPath,
-                    audioPath   = audioPath,
-                    gpsLat      = location.latitude,
-                    gpsLng      = location.longitude,
-                    sta         = formatSta(currentDistanceValue.toInt()),
-                    createdAt   = System.currentTimeMillis()
-                )
-                surveyRepository.insertPciDistressItem(item)
+        return try {
+            val segment    = surveyRepository.getSegmentPciById(segmentId)
+            val sampleArea = segment?.sampleAreaM2 ?: (SEGMENT_LENGTH_PCI * laneWidthM)
+            val density    = (quantity / sampleArea) * 100.0
 
-                recalculateSegmentPCI(segmentId, sampleArea)
+            val dvResult = pciCalculator.calculate(
+                distresses   = listOf(PCICalculator.DistressInput(type, severity, quantity, sampleArea)),
+                sampleAreaM2 = sampleArea
+            )
+            val dv = dvResult.distressBreakdown.firstOrNull()?.deductValue ?: 0.0
 
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to add PCI distress item")
-            }
+            val item = PCIDistressItem(
+                segmentId   = segmentId,
+                sessionId   = sessionId,
+                type        = type,
+                severity    = severity,
+                quantity    = quantity,
+                notes       = notes,
+                density     = density,
+                deductValue = dv,
+                photoPath   = photoPath,
+                audioPath   = audioPath,
+                gpsLat      = location.latitude,
+                gpsLng      = location.longitude,
+                sta         = formatSta(currentDistanceValue.toInt()),
+                createdAt   = System.currentTimeMillis()
+            )
+            surveyRepository.insertPciDistressItem(item)
+            recalculateSegmentPCI(segmentId, sampleArea)
+            Timber.d("PCIDistressItem saved: type=${type.name} seg=$segmentId photo=${photoPath.isNotBlank()}")
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "addPciDistressItem error")
+            false
         }
     }
 
@@ -519,8 +591,15 @@ class SurveyEngine @Inject constructor(
     fun recordVoice(path: String, notes: String? = null) = recordEvent(EventType.VOICE, path, notes)
 
     private fun recordEvent(type: EventType, value: String, notes: String? = null) {
-        val location  = lastLocation ?: return
         val sessionId = currentSessionId ?: return
+
+        // FIX: Jangan drop event karena GPS belum fix — gunakan 0,0 sebagai fallback.
+        // Foto dari FAB kamera di awal survey sebelum bergerak tetap harus tersimpan.
+        val location = lastLocation ?: LocationData(
+            latitude = 0.0, longitude = 0.0, altitude = 0.0,
+            speed = 0f, accuracy = 999f
+        )
+
         val event = RoadEvent(
             sessionId = sessionId,
             timestamp = System.currentTimeMillis(),
@@ -535,7 +614,7 @@ class SurveyEngine @Inject constructor(
             try {
                 surveyRepository.insertEvent(event)
             } catch (e: Exception) {
-                Timber.e(e, "Failed to insert event")
+                Timber.e(e, "Failed to insert event: $type")
             }
         }
     }
