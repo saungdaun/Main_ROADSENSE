@@ -19,6 +19,7 @@ import javax.inject.Singleton
 import javax.inject.Named
 import kotlin.math.*
 import java.lang.Math.toRadians
+import zaujaani.roadsensebasic.util.sensor.GpsConfidenceFilter
 
 @Singleton
 class SurveyEngine @Inject constructor(
@@ -28,18 +29,26 @@ class SurveyEngine @Inject constructor(
     private val vibrationAnalyzer: VibrationAnalyzer,
     private val confidenceCalculator: ConfidenceCalculator,
     private val sdiCalculator: SDICalculator,
-    private val pciCalculator: PCICalculator,                   // ← BARU
+    private val pciCalculator: PCICalculator,
+    gpsConfidenceFilter: GpsConfidenceFilter,
     @param:Named("applicationScope") private val externalScope: CoroutineScope
 ) {
+    // Dedicated scope for all internal coroutines – prevents interference with app scope
+    private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val mutex = Mutex()
 
     private companion object {
         const val SEGMENT_LENGTH          = 100.0   // SDI: 100m per segmen
         const val SEGMENT_LENGTH_PCI      = 50.0    // PCI: 50m per segmen (ASTM D6433)
         const val DEFAULT_LANE_WIDTH      = 3.7     // meter (lebar lajur default)
-        const val MIN_DISTANCE_DELTA      = 1.0
-        const val SPEED_FILTER_FACTOR     = 0.2
-        const val SENSOR_SAMPLE_INTERVAL_MS = 300L
+        // FIX #ENG-1: MIN_DISTANCE_DELTA 1.0→0.5 — tidak reject titik valid saat pelan
+        // FIX #ENG-2: SPEED_FILTER_FACTOR 0.2→0.05 — kurangi agresivitas saat kecepatan tinggi
+        //   Sebelumnya: 60 km/h → threshold 4.3m. Sekarang: 60 km/h → threshold 1.3m
+        // FIX #ENG-3: SENSOR_SAMPLE_INTERVAL_MS 300→150ms (GPS sekarang 500ms)
+        const val MIN_DISTANCE_DELTA        = 0.5
+        const val SPEED_FILTER_FACTOR       = 0.05
+        const val SENSOR_SAMPLE_INTERVAL_MS = 150L
         const val TELEMETRY_FLUSH_INTERVAL_MS = 2000L
     }
 
@@ -61,10 +70,10 @@ class SurveyEngine @Inject constructor(
     private var currentSegmentIndex = -1
     private var currentSegmentId: Long? = null
 
-    // PCI segment state ← BARU
+    // PCI segment state
     private var currentPciSegmentIndex = -1
     private var currentPciSegmentId: Long? = null
-    var laneWidthM: Double = DEFAULT_LANE_WIDTH     // bisa diset dari dialog start survey
+    var laneWidthM: Double = DEFAULT_LANE_WIDTH
 
     // ── Public flows ──────────────────────────────────────────────────────
 
@@ -96,7 +105,6 @@ class SurveyEngine @Inject constructor(
     @Suppress("unused") fun getCurrentMode(): SurveyMode = currentMode
     @Suppress("unused") fun isActive(): Boolean = _sessionState.value == SessionState.SURVEYING
     @Suppress("unused") fun isPaused(): Boolean = _sessionState.value == SessionState.PAUSED
-    // ← BARU
     fun getCurrentPciSegmentId(): Long? = currentPciSegmentId
     fun getCurrentSta(): String = formatSta(currentDistanceValue.toInt())
 
@@ -108,7 +116,7 @@ class SurveyEngine @Inject constructor(
         surveyorName: String = "",
         roadName: String = "",
         mode: SurveyMode = SurveyMode.GENERAL,
-        laneWidth: Double = DEFAULT_LANE_WIDTH      // ← BARU: untuk PCI sample area
+        laneWidth: Double = DEFAULT_LANE_WIDTH
     ): Long {
         _roadName.value = roadName
         _mode.value = mode
@@ -135,8 +143,8 @@ class SurveyEngine @Inject constructor(
         currentSurface  = Surface.ASPAL
         currentSegmentIndex    = -1
         currentSegmentId       = null
-        currentPciSegmentIndex = -1     // ← BARU
-        currentPciSegmentId    = null   // ← BARU
+        currentPciSegmentIndex = -1
+        currentPciSegmentId    = null
         lastSaveTime    = System.currentTimeMillis()
         lastProcessTime = 0L
         mutex.withLock { telemetryBuffer.clear() }
@@ -154,11 +162,9 @@ class SurveyEngine @Inject constructor(
         val session   = surveyRepository.getSessionById(sessionId) ?: return
         val lastLoc   = lastLocation
 
-        // Hitung skor sesuai mode
         val totalSdi = if (currentMode == SurveyMode.SDI) calculateSessionSDI() else 0
-        val totalPci = if (currentMode == SurveyMode.PCI) calculateSessionPCI() else -1  // ← BARU
+        val totalPci = if (currentMode == SurveyMode.PCI) calculateSessionPCI() else -1
 
-        // Rata-rata confidence dari road segments
         val segments = surveyRepository.getSegmentsForSessionOnce(sessionId)
         val avgConf  = if (segments.isNotEmpty()) {
             segments.map { it.confidence }.average().toInt()
@@ -172,7 +178,7 @@ class SurveyEngine @Inject constructor(
                 endLng        = lastLoc?.longitude ?: session.startLng,
                 avgConfidence = avgConf,
                 avgSdi        = totalSdi,
-                avgPci        = totalPci    // ← BARU
+                avgPci        = totalPci
             )
         )
         _sessionState.value = SessionState.ENDED
@@ -185,14 +191,13 @@ class SurveyEngine @Inject constructor(
         return sdiCalculator.calculateAverageSDI(segments.map { it.sdiScore })
     }
 
-    // ← BARU
     suspend fun calculateSessionPCI(): Int {
         val sessionId = currentSessionId ?: return -1
         return surveyRepository.getAveragePci(sessionId)
     }
 
     fun discardCurrentSession() {
-        externalScope.launch {
+        engineScope.launch {
             _sessionState.value = SessionState.IDLE
             clearSessionData()
         }
@@ -208,8 +213,8 @@ class SurveyEngine @Inject constructor(
         _currentVibration.value = 0f
         currentSegmentIndex    = -1
         currentSegmentId       = null
-        currentPciSegmentIndex = -1     // ← BARU
-        currentPciSegmentId    = null   // ← BARU
+        currentPciSegmentIndex = -1
+        currentPciSegmentId    = null
         Timber.d("Session data cleared")
     }
 
@@ -234,27 +239,34 @@ class SurveyEngine @Inject constructor(
         if (now - lastProcessTime < SENSOR_SAMPLE_INTERVAL_MS) return
         lastProcessTime = now
 
+        // FIX #ENG-4 (BUG KRITIS): `lastLocation` sebelumnya selalu diupdate di akhir fungsi,
+        // bahkan saat titik GAGAL lolos filter dinamis.
+        // Akibat: titik berikutnya menghitung delta dari titik YANG DITOLAK,
+        // bukan dari titik terakhir yang valid → jarak under-count + garis macet.
+        //
+        // Perbaikan: lastLocation HANYA diupdate jika titik berhasil lolos filter.
+        // Jika ditolak, lastLocation tetap pada titik valid terakhir.
+
         lastLocation?.let { last ->
             val rawDelta = calculateDistance(last, locationData)
-            val speed    = locationData.speed.coerceAtLeast(0.1f)
-            val dynamicThreshold = MIN_DISTANCE_DELTA + (speed * SPEED_FILTER_FACTOR)
+            val dynamicThreshold = MIN_DISTANCE_DELTA + (locationData.speed.coerceAtLeast(0f) * SPEED_FILTER_FACTOR)
 
-            if (rawDelta > dynamicThreshold && locationData.accuracy < Constants.GPS_ACCURACY_THRESHOLD) {
+            // FIX #ENG-5: Hapus cek akurasi di sini (sudah difilter di SurveyForegroundService).
+            // Double-filtering menyebabkan lebih banyak titik dibuang dari yang perlu.
+            if (rawDelta > dynamicThreshold) {
                 val previousDistance = currentDistanceValue
                 currentDistanceValue += rawDelta
                 _currentDistance.value = currentDistanceValue
 
-                // Trigger setiap 100m
                 val previous100 = (previousDistance / SEGMENT_LENGTH).toInt()
                 val current100  = (currentDistanceValue / SEGMENT_LENGTH).toInt()
                 if (current100 > previous100) _distanceTrigger.tryEmit(currentDistanceValue)
 
-                // ── SDI: buat segmen baru setiap 100m ────────────────────
                 if (currentMode == SurveyMode.SDI) {
                     val newSegIdx = (currentDistanceValue / SEGMENT_LENGTH).toInt()
                     if (newSegIdx != currentSegmentIndex) {
                         currentSegmentIndex = newSegIdx
-                        externalScope.launch {
+                        engineScope.launch {
                             val sessionId = currentSessionId ?: return@launch
                             val seg = SegmentSdi(
                                 sessionId    = sessionId,
@@ -268,13 +280,12 @@ class SurveyEngine @Inject constructor(
                     }
                 }
 
-                // ── PCI: buat segmen baru setiap 50m ─────────────────────
                 if (currentMode == SurveyMode.PCI) {
                     val newSegIdx = (currentDistanceValue / SEGMENT_LENGTH_PCI).toInt()
                     if (newSegIdx != currentPciSegmentIndex) {
                         currentPciSegmentIndex = newSegIdx
                         val loc = locationData
-                        externalScope.launch {
+                        engineScope.launch {
                             val sessionId  = currentSessionId ?: return@launch
                             val sampleArea = SEGMENT_LENGTH_PCI * laneWidthM
                             val seg = SegmentPci(
@@ -294,11 +305,21 @@ class SurveyEngine @Inject constructor(
                         }
                     }
                 }
-            }
-        }
-        lastLocation = locationData
 
-        // ── Sensor & Telemetry ────────────────────────────────────────────
+                // FIX #ENG-4: Update lastLocation HANYA jika titik berhasil diproses
+                lastLocation = locationData
+
+            } else {
+                // Titik terlalu dekat / di bawah threshold — jangan update lastLocation.
+                // Dengan begitu, titik berikutnya akan menghitung delta dari titik VALID terakhir,
+                // bukan dari titik yang ditolak.
+                Timber.v("GPS point skipped: delta=%.2fm < threshold=%.2fm".format(rawDelta, dynamicThreshold))
+            }
+        } ?: run {
+            // Titik pertama (lastLocation masih null) → langsung set tanpa filter
+            lastLocation = locationData
+        }
+
         val vibrationZ = sensorGateway.getLatestVibration()
         val vibrationX = sensorGateway.axisX.value
         val vibrationY = sensorGateway.axisY.value
@@ -338,14 +359,29 @@ class SurveyEngine @Inject constructor(
             confidence         = confidence
         )
 
-        externalScope.launch {
-            mutex.withLock { telemetryBuffer.addLast(telemetry) }
-        }
+        // ════════════════════════════════════════════════════════════════════
+        // TELEMETRY BUFFER & FLUSH — VERSI SOLID (lastSaveTime dalam mutex)
+        // ════════════════════════════════════════════════════════════════════
+        engineScope.launch {
+            val now = System.currentTimeMillis()
 
-        if (telemetryBuffer.size >= Constants.TELEMETRY_BUFFER_SIZE ||
-            now - lastSaveTime > TELEMETRY_FLUSH_INTERVAL_MS) {
-            flushTelemetry()
-            lastSaveTime = now
+            val shouldFlush = mutex.withLock {
+                telemetryBuffer.addLast(telemetry)
+
+                val needFlush =
+                    telemetryBuffer.size >= Constants.TELEMETRY_BUFFER_SIZE ||
+                            now - lastSaveTime > TELEMETRY_FLUSH_INTERVAL_MS
+
+                if (needFlush) {
+                    lastSaveTime = now
+                }
+
+                needFlush
+            }
+
+            if (shouldFlush) {
+                flushTelemetry()
+            }
         }
     }
 
@@ -353,98 +389,168 @@ class SurveyEngine @Inject constructor(
     // DISTRESS — SDI
     // ══════════════════════════════════════════════════════════════════════
 
-    fun addDistressItem(
+    /**
+     * Simpan item kerusakan SDI ke database.
+     *
+     * FIX KRITIS — silent drop sebelumnya:
+     * - `lastLocation == null`  → surveyor belum bergerak setelah start session
+     * - `currentSegmentId == null` → belum jalan 100m, segment belum dibuat otomatis
+     * Keduanya menyebabkan data + foto tidak tersimpan sama sekali tanpa notifikasi error.
+     *
+     * Perbaikan:
+     * 1. `lastLocation == null` → gunakan LocationData(0,0) sebagai fallback
+     * 2. `currentSegmentId == null` → auto-create segmen 0 (STA 0+000–0+100)
+     * 3. Fungsi kini `suspend` + return `Boolean` agar ViewModel bisa cek keberhasilan
+     */
+    suspend fun addDistressItem(
         type: DistressType,
         severity: Severity,
         lengthOrArea: Double,
         photoPath: String = "",
         audioPath: String = "",
         notes: String? = null
-    ) {
-        if (currentMode != SurveyMode.SDI) return
-        val location  = lastLocation ?: return
-        val segmentId = currentSegmentId ?: return
-        val sessionId = currentSessionId ?: return
+    ): Boolean {
+        if (currentMode != SurveyMode.SDI) return false
+        val sessionId = currentSessionId ?: return false
 
-        val item = DistressItem(
-            segmentId    = segmentId,
-            sessionId    = sessionId,
-            type         = type,
-            severity     = severity,
-            lengthOrArea = lengthOrArea,
-            photoPath    = photoPath,
-            audioPath    = audioPath,
-            gpsLat       = location.latitude,
-            gpsLng       = location.longitude,
-            sta          = formatSta(currentDistanceValue.toInt()),
-            notes        = notes ?: "",           // ← FIX #6: sebelumnya hilang
-            createdAt    = System.currentTimeMillis()
+        // FIX: Jangan tolak karena belum ada GPS fix — gunakan fallback 0,0
+        val location = lastLocation ?: LocationData(
+            latitude = 0.0, longitude = 0.0, altitude = 0.0,
+            speed = 0f, accuracy = 999f
         )
-        externalScope.launch {
-            try {
-                surveyRepository.insertDistressItem(item)
-                val items = surveyRepository.getDistressForSegmentOnce(segmentId)
-                val sdi   = sdiCalculator.calculateSegmentSDI(items, segmentLength = SEGMENT_LENGTH)
-            } catch (e: Exception) {
-                Timber.e(e, "addDistressItem error")
-            }
+
+        // FIX: Auto-create segmen 0 jika belum ada (surveyor belum bergerak 100m)
+        val segmentId: Long = currentSegmentId ?: run {
+            val seg = SegmentSdi(
+                sessionId    = sessionId,
+                segmentIndex = 0,
+                startSta     = formatSta(0),
+                endSta       = formatSta(SEGMENT_LENGTH.toInt()),
+                createdAt    = System.currentTimeMillis()
+            )
+            val newId = surveyRepository.insertSegmentSdi(seg)
+            currentSegmentIndex = 0
+            currentSegmentId    = newId
+            Timber.d("Auto-created SDI segment 0 for sessionId=$sessionId")
+            newId
+        }
+
+        return try {
+            val item = DistressItem(
+                segmentId    = segmentId,
+                sessionId    = sessionId,
+                type         = type,
+                severity     = severity,
+                lengthOrArea = lengthOrArea,
+                photoPath    = photoPath,
+                audioPath    = audioPath,
+                gpsLat       = location.latitude,
+                gpsLng       = location.longitude,
+                sta          = formatSta(currentDistanceValue.toInt()),
+                notes        = notes ?: "",
+                createdAt    = System.currentTimeMillis()
+            )
+            surveyRepository.insertDistressItem(item)
+            val items = surveyRepository.getDistressForSegmentOnce(segmentId)
+            sdiCalculator.calculateSegmentSDI(items, segmentLength = SEGMENT_LENGTH)
+            Timber.d("DistressItem saved: type=${type.name} seg=$segmentId photo=${photoPath.isNotBlank()}")
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "addDistressItem error")
+            false
         }
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // DISTRESS — PCI  ← BARU
+    // DISTRESS — PCI
     // ══════════════════════════════════════════════════════════════════════
 
-    fun addPciDistressItem(
+    /**
+     * Simpan item kerusakan PCI ke database.
+     *
+     * FIX KRITIS — silent drop sebelumnya:
+     * - `lastLocation == null`      → belum ada GPS fix setelah start session
+     * - `currentPciSegmentId == null` → belum jalan 50m, segment belum dibuat otomatis
+     *
+     * Perbaikan:
+     * 1. `lastLocation == null` → LocationData(0,0) sebagai fallback
+     * 2. `currentPciSegmentId == null` → auto-create segmen PCI 0 (STA 0+000–0+050)
+     * 3. Return `Boolean` agar ViewModel bisa propagate error ke UI
+     */
+    suspend fun addPciDistressItem(
         type: PCIDistressType,
         severity: Severity,
         quantity: Double,
         photoPath: String = "",
         audioPath: String = "",
         notes: String = ""
-    ) {
-        if (currentMode != SurveyMode.PCI) return
-        val location  = lastLocation ?: return
-        val segmentId = currentPciSegmentId ?: return
-        val sessionId = currentSessionId ?: return
+    ): Boolean {
+        if (currentMode != SurveyMode.PCI) return false
+        val sessionId = currentSessionId ?: return false
 
-        externalScope.launch {
-            try {
-                val segment    = surveyRepository.getSegmentPciById(segmentId)
-                val sampleArea = segment?.sampleAreaM2 ?: (SEGMENT_LENGTH_PCI * laneWidthM)
-                val density    = (quantity / sampleArea) * 100.0
+        // FIX: Fallback location saat GPS belum ada fix
+        val location = lastLocation ?: LocationData(
+            latitude = 0.0, longitude = 0.0, altitude = 0.0,
+            speed = 0f, accuracy = 999f
+        )
 
-                // Hitung DV single item via calculator
-                val dvResult = pciCalculator.calculate(
-                    distresses   = listOf(PCICalculator.DistressInput(type, severity, quantity, sampleArea)),
-                    sampleAreaM2 = sampleArea
-                )
-                val dv = dvResult.distressBreakdown.firstOrNull()?.deductValue ?: 0.0
+        // FIX: Auto-create segmen PCI 0 jika belum ada
+        val segmentId: Long = currentPciSegmentId ?: run {
+            val sampleArea = SEGMENT_LENGTH_PCI * laneWidthM
+            val seg = SegmentPci(
+                sessionId      = sessionId,
+                segmentIndex   = 0,
+                startSta       = formatSta(0),
+                endSta         = formatSta(SEGMENT_LENGTH_PCI.toInt()),
+                startLat       = location.latitude,
+                startLng       = location.longitude,
+                segmentLengthM = SEGMENT_LENGTH_PCI,
+                laneWidthM     = laneWidthM,
+                sampleAreaM2   = sampleArea,
+                createdAt      = System.currentTimeMillis(),
+                updatedAt      = System.currentTimeMillis()
+            )
+            val newId = surveyRepository.insertSegmentPci(seg)
+            currentPciSegmentIndex = 0
+            currentPciSegmentId    = newId
+            Timber.d("Auto-created PCI segment 0 for sessionId=$sessionId sampleArea=$sampleArea")
+            newId
+        }
 
-                val item = PCIDistressItem(
-                    segmentId   = segmentId,
-                    sessionId   = sessionId,
-                    type        = type,
-                    severity    = severity,
-                    quantity    = quantity,
-                    notes       = notes,
-                    density     = density,
-                    deductValue = dv,
-                    photoPath   = photoPath,
-                    audioPath   = audioPath,
-                    gpsLat      = location.latitude,
-                    gpsLng      = location.longitude,
-                    sta         = formatSta(currentDistanceValue.toInt()),
-                    createdAt   = System.currentTimeMillis()
-                )
-                surveyRepository.insertPciDistressItem(item)
+        return try {
+            val segment    = surveyRepository.getSegmentPciById(segmentId)
+            val sampleArea = segment?.sampleAreaM2 ?: (SEGMENT_LENGTH_PCI * laneWidthM)
+            val density    = (quantity / sampleArea) * 100.0
 
-                // Recalculate PCI seluruh segmen setelah item baru masuk
-                recalculateSegmentPCI(segmentId, sampleArea)
+            val dvResult = pciCalculator.calculate(
+                distresses   = listOf(PCICalculator.DistressInput(type, severity, quantity, sampleArea)),
+                sampleAreaM2 = sampleArea
+            )
+            val dv = dvResult.distressBreakdown.firstOrNull()?.deductValue ?: 0.0
 
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to add PCI distress item")
-            }
+            val item = PCIDistressItem(
+                segmentId   = segmentId,
+                sessionId   = sessionId,
+                type        = type,
+                severity    = severity,
+                quantity    = quantity,
+                notes       = notes,
+                density     = density,
+                deductValue = dv,
+                photoPath   = photoPath,
+                audioPath   = audioPath,
+                gpsLat      = location.latitude,
+                gpsLng      = location.longitude,
+                sta         = formatSta(currentDistanceValue.toInt()),
+                createdAt   = System.currentTimeMillis()
+            )
+            surveyRepository.insertPciDistressItem(item)
+            recalculateSegmentPCI(segmentId, sampleArea)
+            Timber.d("PCIDistressItem saved: type=${type.name} seg=$segmentId photo=${photoPath.isNotBlank()}")
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "addPciDistressItem error")
+            false
         }
     }
 
@@ -485,8 +591,15 @@ class SurveyEngine @Inject constructor(
     fun recordVoice(path: String, notes: String? = null) = recordEvent(EventType.VOICE, path, notes)
 
     private fun recordEvent(type: EventType, value: String, notes: String? = null) {
-        val location  = lastLocation ?: return
         val sessionId = currentSessionId ?: return
+
+        // FIX: Jangan drop event karena GPS belum fix — gunakan 0,0 sebagai fallback.
+        // Foto dari FAB kamera di awal survey sebelum bergerak tetap harus tersimpan.
+        val location = lastLocation ?: LocationData(
+            latitude = 0.0, longitude = 0.0, altitude = 0.0,
+            speed = 0f, accuracy = 999f
+        )
+
         val event = RoadEvent(
             sessionId = sessionId,
             timestamp = System.currentTimeMillis(),
@@ -497,11 +610,11 @@ class SurveyEngine @Inject constructor(
             value     = value,
             notes     = notes
         )
-        externalScope.launch {
+        engineScope.launch {
             try {
                 surveyRepository.insertEvent(event)
             } catch (e: Exception) {
-                Timber.e(e, "Failed to insert event")
+                Timber.e(e, "Failed to insert event: $type")
             }
         }
     }
@@ -525,7 +638,7 @@ class SurveyEngine @Inject constructor(
     // ══════════════════════════════════════════════════════════════════════
 
     fun flushTelemetry() {
-        externalScope.launch { flushTelemetryInternal(enableRetry = true) }
+        engineScope.launch { flushTelemetryInternal(enableRetry = true) }
     }
 
     private suspend fun flushTelemetrySync() {
@@ -599,11 +712,16 @@ class SurveyEngine @Inject constructor(
         if (currentState == SessionState.SURVEYING || currentState == SessionState.PAUSED) {
             Timber.w("destroyEngine called while session is $currentState. Session will be discarded.")
         }
-        externalScope.coroutineContext.cancelChildren()
-        externalScope.launch {
-            _sessionState.value = SessionState.IDLE
+
+        // Set state idle dan bersihkan data secara sinkron sebelum scope dicancel
+        _sessionState.value = SessionState.IDLE
+        runBlocking {
             clearSessionData()
         }
+
+        // Baru cancel scope agar tidak ada job baru
+        engineScope.cancel()
+
         Timber.d("SurveyEngine destroyed")
     }
 }

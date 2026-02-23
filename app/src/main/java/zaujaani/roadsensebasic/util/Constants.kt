@@ -23,9 +23,9 @@ object Constants {
     const val DEFAULT_THRESHOLD_RUSAK_RINGAN = 1.0f
 
     // ========== GPS ==========
-    const val DEFAULT_GPS_INTERVAL = 1000L       // ms
-    const val DEFAULT_GPS_MIN_DISTANCE = 1.0f    // meter
-    const val GPS_ACCURACY_THRESHOLD = 25f       // meter, GPS diabaikan jika > ini
+    const val DEFAULT_GPS_INTERVAL = 500L        // FIX: 1000→500ms = titik lebih rapat, garis halus
+    const val DEFAULT_GPS_MIN_DISTANCE = 0.5f    // FIX: 1.0→0.5m = tidak lewat titik valid saat pelan
+    const val GPS_ACCURACY_THRESHOLD = 40f       // FIX: 25→40m = kurangi reject titik di area urban
 
     // ========== FILE PATHS ==========
     const val PHOTO_DIR = "RoadSense/Photos"

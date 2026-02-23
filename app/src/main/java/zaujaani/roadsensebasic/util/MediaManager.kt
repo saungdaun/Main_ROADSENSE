@@ -219,12 +219,17 @@ class MediaManager(
                 val canvas = Canvas(mutableBitmap)
 
                 val dateStr  = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-                val distStr  = if (meta.distanceMeters < 1000) {
+                val distStr = if (meta.distanceMeters < 1000) {
                     "STA: ${meta.distanceMeters.toInt()} m"
                 } else {
-                    "STA: ${String.format("%.2f", meta.distanceMeters / 1000)} km"
+                    "STA: ${String.format(Locale.US, "%.2f", meta.distanceMeters / 1000)} km"
                 }
-                val gpsStr   = "GPS: ${String.format("%.6f", meta.latitude)}, ${String.format("%.6f", meta.longitude)}"
+
+                val gpsStr = "GPS: ${
+                    String.format(Locale.US, "%.6f", meta.latitude)
+                }, ${
+                    String.format(Locale.US, "%.6f", meta.longitude)
+                }"
                 val roadStr  = if (meta.roadName.isNotBlank()) "Ruas: ${meta.roadName}" else "RoadSense"
                 val modeStr  = "Mode: ${meta.surveyMode}"
 

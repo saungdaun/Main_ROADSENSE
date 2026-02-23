@@ -27,30 +27,6 @@ import java.io.File
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
-data class SessionDetailUi(
-    val session: SurveySession,
-    val events: List<RoadEvent>,
-    val totalDistance: Double,
-    val durationMinutes: Int,
-    val avgConfidence: Int,
-    val photoCount: Int,
-    val audioCount: Int,
-    val conditionDistribution: Map<String, Double>,
-    val surfaceDistribution: Map<String, Double>,
-
-    // SDI
-    val mode: SurveyMode,
-    val segmentsSdi: List<SegmentSdi> = emptyList(),
-    val distressItems: List<DistressItem> = emptyList(),
-    val averageSdi: Int = 0,
-
-    // PCI ← BARU
-    val segmentsPci: List<SegmentPci> = emptyList(),
-    val pciDistressItems: List<PCIDistressItem> = emptyList(),
-    val averagePci: Int = -1,
-    val pciRating: PCIRating? = null
-)
-
 @HiltViewModel
 class SummaryViewModel @Inject constructor(
     private val surveyRepository: SurveyRepository,
@@ -77,7 +53,6 @@ class SummaryViewModel @Inject constructor(
             try {
                 surveyRepository.getSessionsWithCount().collect { list ->
                     _sessions.value = list
-                    Timber.d("Loaded ${list.size} sessions")
                     _isLoading.value = false
                 }
             } catch (e: Exception) {
@@ -93,16 +68,14 @@ class SummaryViewModel @Inject constructor(
             _isLoading.value = true
             try {
                 val session = surveyRepository.getSessionById(sessionId) ?: run {
-                    Timber.w("Session $sessionId not found")
                     _sessionDetail.value = null
                     return@launch
                 }
 
-                val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
-                val events      = surveyRepository.getEventsForSession(sessionId)
-
+                val telemetries     = telemetryRepository.getTelemetryForSessionOnce(sessionId)
+                val events          = surveyRepository.getEventsForSession(sessionId)
                 val totalDistance   = session.totalDistance
-                val durationMinutes = ((session.endTime ?: session.startTime) - session.startTime) / 60000
+                val durationMinutes = ((session.endTime ?: System.currentTimeMillis()) - session.startTime) / 60000
 
                 val avgConfidence = if (telemetries.isNotEmpty()) {
                     telemetries.map { (100 - (it.gpsAccuracy * 2)).coerceIn(0f, 100f).toInt() }
@@ -112,7 +85,7 @@ class SummaryViewModel @Inject constructor(
                 val photoCount = events.count { it.eventType == EventType.PHOTO }
                 val audioCount = events.count { it.eventType == EventType.VOICE }
 
-                // Hitung distribusi kondisi & permukaan dari telemetri
+                // Distribusi kondisi & permukaan
                 val conditionMap = mutableMapOf<String, Double>()
                 val surfaceMap   = mutableMapOf<String, Double>()
                 if (telemetries.size >= 2) {
@@ -135,56 +108,80 @@ class SummaryViewModel @Inject constructor(
                 val mode = session.mode
 
                 // ── SDI data ──────────────────────────────────────────────
-                val segmentsSdi = if (mode == SurveyMode.SDI) {
+                val segmentsSdi = if (mode == SurveyMode.SDI)
                     surveyRepository.getSegmentSdiForSessionOnce(sessionId)
-                } else emptyList()
+                else emptyList()
 
-                val distressItems = if (mode == SurveyMode.SDI) {
+                val distressItems = if (mode == SurveyMode.SDI)
                     surveyRepository.getDistressForSession(sessionId)
-                } else emptyList()
+                else emptyList()
 
-                val averageSdi = if (segmentsSdi.isNotEmpty()) {
+                val averageSdi = if (segmentsSdi.isNotEmpty())
                     segmentsSdi.map { it.sdiScore }.average().toInt()
-                } else 0
+                else 0
 
-                // ── PCI data ← BARU ───────────────────────────────────────
-                val segmentsPci = if (mode == SurveyMode.PCI) {
+                // ── PCI data ──────────────────────────────────────────────
+                val segmentsPci = if (mode == SurveyMode.PCI)
                     surveyRepository.getSegmentPciForSessionOnce(sessionId)
-                } else emptyList()
+                else emptyList()
 
-                val pciDistressItems = if (mode == SurveyMode.PCI) {
+                val pciDistressItems = if (mode == SurveyMode.PCI)
                     surveyRepository.getPciDistressForSession(sessionId)
-                } else emptyList()
+                else emptyList()
 
                 val averagePci = if (segmentsPci.isNotEmpty()) {
-                    segmentsPci.filter { it.pciScore >= 0 }
-                        .map { it.pciScore }
+                    segmentsPci.filter { it.pciScore >= 0 }.map { it.pciScore }
                         .let { scores -> if (scores.isNotEmpty()) scores.average().toInt() else -1 }
                 } else session.avgPci
 
                 val pciRating = if (averagePci >= 0) PCIRating.fromScore(averagePci) else null
 
+                // ── Foto per kategori (raw, untuk backward compat & export) ──
+                val generalPhotos = events
+                    .filter { it.eventType == EventType.PHOTO && it.value.isNotBlank() && File(it.value).exists() }
+
+                val sdiPhotos = distressItems
+                    .mapNotNull { it.photoPath }
+                    .filter { it.isNotBlank() && File(it).exists() }
+
+                val pciPhotos = pciDistressItems
+                    .mapNotNull { it.photoPath }
+                    .filter { it.isNotBlank() && File(it).exists() }
+
+                // ⭐ BUILD allPhotos — gabungan semua sumber, semua mode
+                val allPhotos = buildAllPhotos(
+                    mode             = mode,
+                    generalPhotos    = generalPhotos,
+                    distressItems    = distressItems,
+                    pciDistressItems = pciDistressItems
+                )
+
                 val detail = SessionDetailUi(
-                    session              = session,
-                    events               = events,
-                    totalDistance        = totalDistance,
-                    durationMinutes      = durationMinutes.toInt(),
-                    avgConfidence        = avgConfidence,
-                    photoCount           = photoCount,
-                    audioCount           = audioCount,
+                    session               = session,
+                    mode                  = mode,
+                    totalDistance         = totalDistance,
+                    durationMinutes       = durationMinutes,
+                    avgConfidence         = avgConfidence,
+                    averageSdi            = averageSdi,
+                    segmentsSdi           = segmentsSdi,
+                    distressItems         = distressItems,
+                    averagePci            = averagePci,
+                    pciRating             = pciRating,
+                    segmentsPci           = segmentsPci,
+                    pciDistressItems      = pciDistressItems,
+                    events                = events,
+                    generalPhotos         = generalPhotos,
+                    sdiPhotos             = sdiPhotos,
+                    pciPhotos             = pciPhotos,
+                    allPhotos             = allPhotos,
                     conditionDistribution = conditionMap,
-                    surfaceDistribution  = surfaceMap,
-                    mode                 = mode,
-                    segmentsSdi          = segmentsSdi,
-                    distressItems        = distressItems,
-                    averageSdi           = averageSdi,
-                    segmentsPci          = segmentsPci,       // ← BARU
-                    pciDistressItems     = pciDistressItems,  // ← BARU
-                    averagePci           = averagePci,        // ← BARU
-                    pciRating            = pciRating          // ← BARU
+                    surfaceDistribution   = surfaceMap,
+                    photoCount            = photoCount,
+                    audioCount            = audioCount
                 )
                 _sessionDetail.value = detail
-                Timber.d("Loaded detail: sessionId=$sessionId mode=$mode avgSdi=$averageSdi avgPci=$averagePci")
+                Timber.d("Detail loaded: sessionId=$sessionId mode=$mode photos=${allPhotos.size}")
+
             } catch (e: Exception) {
                 Timber.e(e, "Gagal memuat detail sesi $sessionId")
                 _sessionDetail.value = null
@@ -194,12 +191,107 @@ class SummaryViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Bangun daftar foto gabungan dari semua sumber.
+     *
+     * Prioritas tampil:
+     * 1. Foto dari distress items (paling relevan untuk SDI/PCI)
+     * 2. Foto dari FAB kamera umum (overview lapangan)
+     *
+     * Semua mode mendapatkan foto FAB kamera umum.
+     * SDI/PCI mendapatkan foto distress lebih dulu.
+     */
+    private fun buildAllPhotos(
+        mode: SurveyMode,
+        generalPhotos: List<RoadEvent>,
+        distressItems: List<DistressItem>,
+        pciDistressItems: List<PCIDistressItem>
+    ): List<PhotoItem> {
+        val list = mutableListOf<PhotoItem>()
+
+        when (mode) {
+            SurveyMode.SDI -> {
+                // 1. Foto dari setiap distress item SDI
+                distressItems.forEach { item ->
+                    val path = item.photoPath ?: return@forEach
+                    if (path.isBlank() || !File(path).exists()) return@forEach
+                    list += PhotoItem(
+                        path   = path,
+                        label  = "${item.type.displayName} (${item.severity.name}) | SDI",
+                        sta    = item.sta,
+                        notes  = item.notes ?: "",
+                        source = PhotoItem.Source.DISTRESS
+                    )
+                }
+                // 2. Foto umum dari FAB kamera saat survey SDI
+                generalPhotos.forEach { event ->
+                    if (!File(event.value).exists()) return@forEach
+                    list += PhotoItem(
+                        path   = event.value,
+                        label  = "Foto Lapangan | SDI",
+                        sta    = formatSta(event.distance.toInt()),
+                        notes  = event.notes ?: "",
+                        source = PhotoItem.Source.GENERAL
+                    )
+                }
+            }
+
+            SurveyMode.PCI -> {
+                // 1. Foto dari setiap distress item PCI
+                pciDistressItems.forEach { item ->
+                    val path = item.photoPath ?: return@forEach
+                    if (path.isBlank() || !File(path).exists()) return@forEach
+                    list += PhotoItem(
+                        path   = path,
+                        label  = "${item.type.displayName} (${item.severity.name}) | PCI",
+                        sta    = item.sta,
+                        notes  = item.notes,
+                        source = PhotoItem.Source.DISTRESS
+                    )
+                }
+                // 2. Foto umum dari FAB kamera saat survey PCI
+                generalPhotos.forEach { event ->
+                    if (!File(event.value).exists()) return@forEach
+                    list += PhotoItem(
+                        path   = event.value,
+                        label  = "Foto Lapangan | PCI",
+                        sta    = formatSta(event.distance.toInt()),
+                        notes  = event.notes ?: "",
+                        source = PhotoItem.Source.GENERAL
+                    )
+                }
+            }
+
+            SurveyMode.GENERAL -> {
+                generalPhotos.forEach { event ->
+                    if (!File(event.value).exists()) return@forEach
+                    list += PhotoItem(
+                        path   = event.value,
+                        label  = "Foto Dokumentasi",
+                        sta    = formatSta(event.distance.toInt()),
+                        notes  = event.notes ?: "",
+                        source = PhotoItem.Source.GENERAL
+                    )
+                }
+            }
+        }
+
+        return list
+    }
+
+    private fun formatSta(meters: Int): String {
+        val km = meters / 1000
+        val m  = meters % 1000
+        return "STA %d+%03d".format(km, m)
+    }
+
+    // ── Session operations ─────────────────────────────────────────────────
+
     fun deleteSession(session: SurveySession) {
         viewModelScope.launch {
             try {
                 telemetryRepository.deleteBySession(session.id)
                 surveyRepository.deleteSessionById(session.id)
-                Timber.d("Deleted session ${session.id}")
                 loadSessions()
             } catch (e: Exception) {
                 Timber.e(e, "Gagal menghapus sesi ${session.id}")
@@ -207,7 +299,7 @@ class SummaryViewModel @Inject constructor(
         }
     }
 
-    // ── Export ────────────────────────────────────────────────────────────
+    // ── Export ─────────────────────────────────────────────────────────────
 
     fun exportSessionToGpx(sessionId: Long, callback: (File?) -> Unit) {
         viewModelScope.launch {
@@ -216,13 +308,7 @@ class SummaryViewModel @Inject constructor(
                 val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
                 if (telemetries.isEmpty()) return@launch callback(null)
                 val events = surveyRepository.getEventsForSession(sessionId)
-                val file = FileExporter.exportToGpx(
-                    context     = context,
-                    sessionName = "RoadSense_${session.startTime}",
-                    telemetries = telemetries,
-                    events      = events
-                )
-                callback(file)
+                callback(FileExporter.exportToGpx(context, "RoadSense_${session.startTime}", telemetries, events))
             } catch (e: Exception) {
                 Timber.e(e, "GPX export error")
                 callback(null)
@@ -236,14 +322,7 @@ class SummaryViewModel @Inject constructor(
                 val session     = surveyRepository.getSessionById(sessionId) ?: return@launch callback(null)
                 val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
                 val events      = surveyRepository.getEventsForSession(sessionId)
-                val file = FileExporter.exportToCsv(
-                    context     = context,
-                    sessionName = "RoadSense_${session.startTime}",
-                    session     = session,
-                    telemetries = telemetries,
-                    events      = events
-                )
-                callback(file)
+                callback(FileExporter.exportToCsv(context, "RoadSense_${session.startTime}", session, telemetries, events))
             } catch (e: Exception) {
                 Timber.e(e, "CSV export error")
                 callback(null)
@@ -259,27 +338,14 @@ class SummaryViewModel @Inject constructor(
                 val events      = surveyRepository.getEventsForSession(sessionId)
                 val mode        = session.mode
 
-                val segmentsSdi = if (mode == SurveyMode.SDI) {
-                    surveyRepository.getSegmentSdiForSessionOnce(sessionId)
-                } else emptyList()
+                val segmentsSdi      = if (mode == SurveyMode.SDI) surveyRepository.getSegmentSdiForSessionOnce(sessionId) else emptyList()
+                val distressItems    = if (mode == SurveyMode.SDI) surveyRepository.getDistressForSession(sessionId) else emptyList()
+                val segmentsPci      = if (mode == SurveyMode.PCI) surveyRepository.getSegmentPciForSessionOnce(sessionId) else emptyList()
+                val pciDistressItems = if (mode == SurveyMode.PCI) surveyRepository.getPciDistressForSession(sessionId) else emptyList()
 
-                val distressItems = if (mode == SurveyMode.SDI) {
-                    surveyRepository.getDistressForSession(sessionId)
-                } else emptyList()
-
-                // ← BARU: data PCI untuk PDF
-                val segmentsPci = if (mode == SurveyMode.PCI) {
-                    surveyRepository.getSegmentPciForSessionOnce(sessionId)
-                } else emptyList()
-
-                val pciDistressItems = if (mode == SurveyMode.PCI) {
-                    surveyRepository.getPciDistressForSession(sessionId)
-                } else emptyList()
-
-                val avgConfidence = if (telemetries.isNotEmpty()) {
-                    telemetries.map { (100 - (it.gpsAccuracy * 2)).coerceIn(0f, 100f).toInt() }
-                        .average().roundToInt()
-                } else 0
+                val avgConfidence = if (telemetries.isNotEmpty())
+                    telemetries.map { (100 - (it.gpsAccuracy * 2)).coerceIn(0f, 100f).toInt() }.average().roundToInt()
+                else 0
 
                 val conditionMap = mutableMapOf<String, Double>()
                 val surfaceMap   = mutableMapOf<String, Double>()
@@ -300,7 +366,7 @@ class SummaryViewModel @Inject constructor(
                     }
                 }
 
-                val file = PDFExporter.exportToPdf(
+                callback(PDFExporter.exportToPdf(
                     context               = context,
                     session               = session,
                     telemetries           = telemetries,
@@ -309,10 +375,9 @@ class SummaryViewModel @Inject constructor(
                     distressItems         = distressItems,
                     conditionDistribution = conditionMap,
                     surfaceDistribution   = surfaceMap,
-                    segmentsPci           = segmentsPci,      // ← BARU
-                    pciDistressItems      = pciDistressItems  // ← BARU
-                )
-                callback(file)
+                    segmentsPci           = segmentsPci,
+                    pciDistressItems      = pciDistressItems
+                ))
             } catch (e: Exception) {
                 Timber.e(e, "PDF export error")
                 callback(null)

@@ -52,7 +52,9 @@ class DistressViewModel @Inject constructor(
             }
 
             try {
-                surveyEngine.addDistressItem(
+                // FIX: addDistressItem sekarang suspend + return Boolean
+                // Error engine (loc null, segment null) sekarang terdeteksi dan dilaporkan ke UI
+                val saved = surveyEngine.addDistressItem(
                     type         = type,
                     severity     = severity,
                     lengthOrArea = lengthOrArea,
@@ -60,6 +62,11 @@ class DistressViewModel @Inject constructor(
                     audioPath    = audioPath,
                     notes        = notes.takeIf { it.isNotBlank() }
                 )
+
+                if (!saved) {
+                    _saveResult.value = SaveResult.Error("Gagal menyimpan — pastikan survey aktif dan coba lagi")
+                    return@launch
+                }
 
                 if (photoPath.isNotBlank()) {
                     registerPhotoForAnalysis(photoPath)
@@ -74,7 +81,7 @@ class DistressViewModel @Inject constructor(
         }
     }
 
-    // ── Simpan distress item untuk PCI (BARU) ───────────────────────────
+    // ── Simpan distress item untuk PCI ──────────────────────────────────
     fun savePciDistress(
         type: PCIDistressType,
         severity: Severity,
@@ -92,14 +99,20 @@ class DistressViewModel @Inject constructor(
             }
 
             try {
-                surveyEngine.addPciDistressItem(
-                    type       = type,
-                    severity   = severity,
-                    quantity   = quantity,
-                    photoPath  = photoPath,
-                    audioPath  = audioPath,
-                    notes      = notes
+                // FIX: addPciDistressItem sekarang suspend + return Boolean
+                val saved = surveyEngine.addPciDistressItem(
+                    type      = type,
+                    severity  = severity,
+                    quantity  = quantity,
+                    photoPath = photoPath,
+                    audioPath = audioPath,
+                    notes     = notes
                 )
+
+                if (!saved) {
+                    _saveResult.value = SaveResult.Error("Gagal menyimpan — pastikan survey aktif dan coba lagi")
+                    return@launch
+                }
 
                 if (photoPath.isNotBlank()) {
                     registerPhotoForAnalysis(photoPath)

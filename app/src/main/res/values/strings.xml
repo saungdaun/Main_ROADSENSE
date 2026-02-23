@@ -231,7 +231,7 @@
     <!-- Snackbar saat rekaman suara sedang berjalan (maks 30 dtk) -->
     <string name="recording_active">⏺ Merekam suara… (maks 30 dtk)</string>
     <!-- Badge nomor segmen aktif: %1$d = nomor segmen, %2$s = "SDI" atau "PCI" -->
-    <string name="segment_badge">Segmen %1$d (%2$s)</string>
+    <string name="segment_badge">Segment %1$d (%2$s)</string>
 
 
 

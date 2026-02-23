@@ -19,45 +19,113 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import timber.log.Timber
+import zaujaani.roadsensebasic.util.sensor.GpsConfidenceFilter
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * GPSGateway — wraps FusedLocationProviderClient as a Flow.
+ * GPSGateway v2.1 — FusedLocationProvider sebagai Flow.
  *
- * MIUI note: On MIUI/HyperOS, background location can be throttled.
- * The foreground service + PRIORITY_HIGH_ACCURACY keeps GPS alive.
- * Interval is set to 1000ms, minUpdate 500ms — suitable for road survey at up to 120 km/h.
+ * PERBAIKAN vs v2:
+ *
+ * FIX #GPS-1 — Filter warm-up menyebabkan garis muncul telat (utama)
+ *   Root cause: `gpsConfidenceFilter.reset()` dipanggil di `awaitClose`.
+ *   Setiap kali GPS flow baru dimulai (survey baru / balik dari layar lain),
+ *   filter mulai cold lagi → butuh N titik untuk warm-up → polyline telat muncul.
+ *   FIX: Hapus `gpsConfidenceFilter.reset()` dari awaitClose.
+ *        Tambahkan warmup bypass: 5 titik pertama SELALU lolos konfiden filter.
+ *
+ * FIX #GPS-2 — Interval GPS terlalu lambat (1000ms → 500ms)
+ *   Di 60 km/h, 1 detik = 16.7m antar titik → garis kasar/patah-patah.
+ *   Dengan 500ms → max 8.3m antar titik → garis lebih halus.
+ *
+ * FIX #GPS-3 — Near-duplicate threshold 0.5m terlalu ketat saat berjalan pelan
+ *   Diubah ke 0.2m. Cukup untuk hindari titik duplikat saat berhenti,
+ *   tapi tidak membuang titik valid saat kendaraan berjalan pelan (< 5 km/h).
  */
 @Singleton
 class GPSGateway @Inject constructor(
-    private val context: Context
+    private val context: Context,
+    private val gpsConfidenceFilter: GpsConfidenceFilter
 ) {
     private val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
 
-    private fun createLocationRequest(intervalMs: Long = 1000L): LocationRequest =
+    companion object {
+        // FIX #GPS-2: 500ms = titik lebih rapat, garis lebih halus
+        private const val DEFAULT_INTERVAL_MS = 500L
+
+        // Bypass confidence filter untuk N titik pertama saat flow baru dimulai
+        private const val WARMUP_BYPASS_COUNT = 5
+
+        // FIX #GPS-3: lebih lenient agar kendaraan pelan tidak drop titik
+        private const val MIN_DISTANCE_THRESHOLD = 0.2f
+    }
+
+    private fun createLocationRequest(intervalMs: Long = DEFAULT_INTERVAL_MS): LocationRequest =
         LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
             .setMinUpdateIntervalMillis(intervalMs / 2)
-            .setMinUpdateDistanceMeters(0f)
-            .setWaitForAccurateLocation(false)
+            .setMinUpdateDistanceMeters(0f)           // jangan batasi jarak — engine yang filter
+            .setWaitForAccurateLocation(false)         // jangan tunggu akurasi bagus → responsif
             .build()
 
     /**
-     * Continuous location flow.
-     * Intended for use from ForegroundService and ViewModel.
+     * Continuous location flow — digunakan oleh ForegroundService (engine) DAN
+     * MapViewModel (UI / polyline).
+     *
+     * Filter yang diterapkan di sini:
+     * 1. Warmup bypass: 5 titik pertama SELALU lolos (hindari delay awal)
+     * 2. GpsConfidenceFilter: titik noisy ditolak SETELAH warmup
+     * 3. Near-duplicate: titik yang sama persis (< 0.2m) tidak di-emit
+     *
+     * Filter accuracy (> 40m) dilakukan di SurveyForegroundService bukan di sini,
+     * agar MapFragment tetap bisa update posisi marker walaupun akurasi kurang bagus.
      */
-    fun getLocationFlow(intervalMs: Long = 1000L): Flow<Location> = callbackFlow {
+    fun getLocationFlow(intervalMs: Long = DEFAULT_INTERVAL_MS): Flow<Location> = callbackFlow {
+
         if (!hasLocationPermission()) {
-            Timber.w("GPSGateway: location permission missing, flow will emit nothing")
+            Timber.w("GPSGateway: permission missing")
             awaitClose { }
             return@callbackFlow
         }
 
+        var lastEmittedLocation: Location? = null
+        // FIX #GPS-1: warmup counter — bypass confidence filter untuk N titik pertama
+        var warmupRemaining = WARMUP_BYPASS_COUNT
+
         val callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 result.lastLocation?.let { location ->
-                    trySend(location)
+
+                    // FIX #GPS-1: warmup bypass — jangan reject titik pertama
+                    val isWarmup = warmupRemaining > 0
+                    if (isWarmup) {
+                        warmupRemaining--
+                    } else {
+                        // Setelah warmup: cek confidence filter
+                        if (!gpsConfidenceFilter.isValid(location)) {
+                            Timber.d(
+                                "GPS filtered (post-warmup): acc=${location.accuracy}, " +
+                                        "speed=${if (location.hasSpeed()) "%.1f".format(location.speed) else "n/a"}"
+                            )
+                            return
+                        }
+                    }
+
+                    // FIX #GPS-3: Near-duplicate filter (lebih lenient: 0.2m vs 0.5m)
+                    lastEmittedLocation?.let { prev ->
+                        if (prev.distanceTo(location) < MIN_DISTANCE_THRESHOLD) {
+                            Timber.v("GPS duplicate dropped (distance < ${MIN_DISTANCE_THRESHOLD}m)")
+                            return
+                        }
+                    }
+
+                    val result = trySend(location)
+                    if (result.isSuccess) {
+                        lastEmittedLocation = location
+                    } else {
+                        Timber.w("GPS dropped: collector busy")
+                    }
                 }
             }
         }
@@ -66,29 +134,33 @@ class GPSGateway @Inject constructor(
             fusedLocationClient.requestLocationUpdates(
                 createLocationRequest(intervalMs),
                 callback,
-                Looper.getMainLooper()
+                Looper.myLooper() ?: Looper.getMainLooper()
             ).addOnFailureListener { e ->
-                Timber.e(e, "GPSGateway: failed to request location updates")
+                Timber.e(e, "GPSGateway: failed to request updates")
                 close(e)
             }
         } catch (e: SecurityException) {
-            Timber.e(e, "GPSGateway: SecurityException requesting updates")
+            Timber.e(e, "GPSGateway: SecurityException")
             close(e)
         }
 
         awaitClose {
             try {
                 fusedLocationClient.removeLocationUpdates(callback)
-                Timber.d("GPSGateway: location updates removed")
+                // FIX #GPS-1: JANGAN reset filter di sini!
+                // Reset menyebabkan filter cold setiap kali flow baru dimulai.
+                // Filter sengaja dibiarkan warm agar survey berikutnya langsung responsif.
+                // gpsConfidenceFilter.reset() ← DIHAPUS
+                Timber.d("GPSGateway: location updates removed (filter kept warm)")
             } catch (e: Exception) {
-                Timber.w(e, "GPSGateway: error removing location updates")
+                Timber.w(e, "GPSGateway: error on close")
             }
         }
     }
 
     /**
-     * One-shot last known location — may be null or stale.
-     * Gunakan hanya untuk inisialisasi awal, bukan untuk tracking.
+     * One-shot last known location.
+     * Untuk inisialisasi awal peta, bukan tracking.
      */
     @RequiresPermission(
         anyOf = [
@@ -100,19 +172,12 @@ class GPSGateway @Inject constructor(
         if (!hasLocationPermission()) return null
         return try {
             fusedLocationClient.lastLocation.await()
-        } catch (e: SecurityException) {
-            Timber.w(e, "GPSGateway: SecurityException getting last location")
-            null
         } catch (e: Exception) {
-            Timber.w(e, "GPSGateway: failed to get last known location")
+            Timber.w(e, "GPSGateway: failed to get last location")
             null
         }
     }
 
-    /**
-     * Returns true if the device GPS provider is enabled.
-     * Berguna untuk menampilkan dialog "aktifkan GPS" ke user.
-     */
     fun isGpsProviderEnabled(): Boolean {
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         return lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
