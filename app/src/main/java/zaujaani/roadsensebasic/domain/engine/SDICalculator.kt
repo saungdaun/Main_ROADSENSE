@@ -40,21 +40,9 @@ import javax.inject.Singleton
 @Singleton
 class SDICalculator @Inject constructor() {
 
-    private fun getBaseWeight(type: DistressType): Double = when (type) {
-        DistressType.POTHOLE    -> 30.0  // Lubang: pengaruh terbesar ke SDI
-        DistressType.RUTTING    -> 25.0  // Alur: bahaya aquaplaning
-        DistressType.CRACK      -> 15.0  // Retak: menurunkan struktur
-        DistressType.SPALLING   -> 12.0  // Pengelupasan
-        DistressType.RAVELING   -> 10.0  // Lepas agregat
-        DistressType.DEPRESSION -> 20.0  // Ambles: bahaya dan bergenang
-        else                    ->  8.0  // Tipe lain default
-    }
+    private fun getBaseWeight(type: DistressType): Double = baseWeight(type)
 
-    private fun getSeverityFactor(severity: Severity): Double = when (severity) {
-        Severity.LOW    -> 1.0
-        Severity.MEDIUM -> 2.0
-        Severity.HIGH   -> 3.5   // Non-linear (kerusakan parah tidak sekadar 3×)
-    }
+    private fun getSeverityFactor(severity: Severity): Double = severityFactor(severity)
 
     /**
      * Hitung SDI untuk satu segmen.
@@ -84,10 +72,8 @@ class SDICalculator @Inject constructor() {
             totalDeductValue *= (1.0 + (uniqueTypes - 2) * 0.10)
         }
 
-        // FIX v3: maxExpected dinaikkan ke 350 (sebelumnya 180, terlalu kecil).
-        // Worst case dengan 4 tipe kerusakan HIGH extent=1.0: ~347
-        val maxExpected = 350.0
-        val sdi = ((totalDeductValue / maxExpected) * 100).coerceIn(0.0, 100.0)
+        // FIX v3: maxExpected dinaikkan ke 350, dipindah ke companion sebagai MAX_EXPECTED
+        val sdi = ((totalDeductValue / MAX_EXPECTED) * 100).coerceIn(0.0, 100.0)
 
         return sdi.toInt()
     }
@@ -119,6 +105,35 @@ class SDICalculator @Inject constructor() {
             in 41..60 -> "Sedang"
             in 61..80 -> "Rusak Ringan"
             else      -> "Rusak Berat"
+        }
+
+        /** Bobot dasar per jenis kerusakan (digunakan juga di laporan breakdown) */
+        fun baseWeight(type: DistressType): Double = when (type) {
+            DistressType.POTHOLE    -> 30.0
+            DistressType.RUTTING    -> 25.0
+            DistressType.DEPRESSION -> 20.0
+            DistressType.CRACK      -> 15.0
+            DistressType.SPALLING   -> 12.0
+            DistressType.RAVELING   -> 10.0
+            else                    ->  8.0
+        }
+
+        /** Faktor severity (digunakan juga di laporan breakdown) */
+        fun severityFactor(severity: Severity): Double = when (severity) {
+            Severity.LOW    -> 1.0
+            Severity.MEDIUM -> 2.0
+            Severity.HIGH   -> 3.5
+        }
+
+        /** Nilai normalisasi maksimum (worst-case 4 tipe HIGH extent=1.0 + penalti) */
+        const val MAX_EXPECTED = 350.0
+
+        fun getRecommendation(sdi: Int): String = when (sdi) {
+            in 0..20  -> "✓ Kondisi Baik Sekali — pemeliharaan rutin"
+            in 21..40 -> "✓ Kondisi Baik — pemeliharaan rutin"
+            in 41..60 -> "⚠️ Kondisi Sedang — pemeliharaan berkala"
+            in 61..80 -> "⚠️ Kondisi Rusak Ringan — perlu rehabilitasi/peningkatan"
+            else      -> "🔴 Kondisi Rusak Berat — perlu rekonstruksi"
         }
     }
 }

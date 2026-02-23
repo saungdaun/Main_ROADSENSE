@@ -1,92 +1,223 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+    item_session.xml — Kartu session dengan diferensiasi visual per survey mode.
+
+    Desain:
+    ┌──────────────────────────────────────────────────┐
+    │▌  🛣 Jl. Sudirman   👤 Budi Santoso             │  ← strip warna kiri (beda per mode)
+    │▌                                                 │
+    │▌  [SURVEI SDI]  23 Feb 2026 · 09:41             │  ← badge mode + tanggal
+    │▌                                                 │
+    │▌  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
+    │▌  │ 2.5 km   │  │ SDI: 72  │  │ 14 seg   │      │  ← metric chips (beda isi per mode)
+    │▌  └──────────┘  └──────────┘  └──────────┘      │
+    │▌                                         [Detail]│
+    └──────────────────────────────────────────────────┘
+
+    Strip warna kiri:
+    - GENERAL → Biru (#1565C0)
+    - SDI     → Oranye (#E65100)
+    - PCI     → Hijau (#2E7D32)
+-->
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="4dp"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="4dp">
+    android:layout_marginHorizontal="8dp"
+    android:layout_marginVertical="5dp"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="3dp"
+    app:cardBackgroundColor="@color/surface">
 
+    <!-- Row utama: strip kiri + konten -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="12dp">
+        android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/tvDate"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="20 Jan 2025 10:30"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="?android:attr/textColorPrimary" />
+        <!-- ── Strip warna kiri (dikontrol dari Adapter) ── -->
+        <View
+            android:id="@+id/viewModeStrip"
+            android:layout_width="5dp"
+            android:layout_height="match_parent"
+            android:background="@color/primary" />
 
-        <TextView
-            android:id="@+id/tvDevice"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Device: Pixel 6"
-            android:textSize="14sp"
-            android:layout_marginTop="4dp"
-            android:textColor="?android:attr/textColorSecondary" />
-
+        <!-- ── Konten utama ── -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp"
-            android:gravity="center_vertical">
+            android:orientation="vertical"
+            android:padding="12dp">
 
-            <TextView
-                android:layout_width="0dp"
+            <!-- Row 1: Badge mode + tanggal -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/total_distance"
-                android:textSize="14sp"
-                android:textColor="?android:attr/textColorSecondary" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
 
+                <!-- Badge mode (chip kecil berisi label mode) -->
+                <TextView
+                    android:id="@+id/tvModeBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="3dp"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/white"
+                    android:letterSpacing="0.08"
+                    android:background="@drawable/bg_chip_rounded"
+                    android:text="UMUM"
+                    android:layout_marginEnd="8dp" />
+
+                <!-- Tanggal survey -->
+                <TextView
+                    android:id="@+id/tvDate"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:text="23 Feb 2026 · 09:41" />
+
+            </LinearLayout>
+
+            <!-- Row 2: Nama jalan (jika ada) -->
             <TextView
-                android:id="@+id/tvTotalDistance"
-                android:layout_width="wrap_content"
+                android:id="@+id/tvRoadName"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="2.5 km"
-                android:textSize="14sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
-                android:textColor="?android:attr/textColorPrimary" />
-        </LinearLayout>
+                android:textColor="@color/text_primary"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:layout_marginBottom="2dp"
+                android:text="Jl. Sudirman" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
+            <!-- Row 3: Nama surveyor (jika ada) -->
             <TextView
-                android:layout_width="0dp"
+                android:id="@+id/tvSurveyor"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/event_count"
-                android:textSize="14sp"
-                android:textColor="?android:attr/textColorSecondary" />
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginBottom="10dp"
+                android:text="👤 Budi Santoso" />
 
-            <TextView
-                android:id="@+id/tvSegmentCount"
+            <!-- Row 4: Metric chips (3 chip horizontal) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="10dp">
+
+                <!-- Chip 1: Jarak -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:paddingVertical="6dp"
+                    android:paddingHorizontal="4dp"
+                    android:background="@drawable/bg_metric_chip">
+
+                    <TextView
+                        android:id="@+id/tvDistanceValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary"
+                        android:text="2.5 km" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="10sp"
+                        android:textColor="@color/text_secondary"
+                        android:text="Jarak" />
+                </LinearLayout>
+
+                <!-- Chip 2: Skor mode (SDI / PCI / Event) -->
+                <LinearLayout
+                    android:id="@+id/llMetric2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="4dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:paddingVertical="6dp"
+                    android:paddingHorizontal="4dp"
+                    android:background="@drawable/bg_metric_chip">
+
+                    <TextView
+                        android:id="@+id/tvScoreValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary"
+                        android:text="—" />
+
+                    <TextView
+                        android:id="@+id/tvScoreLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="10sp"
+                        android:textColor="@color/text_secondary"
+                        android:text="Skor" />
+                </LinearLayout>
+
+                <!-- Chip 3: Event / Segmen -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:paddingVertical="6dp"
+                    android:paddingHorizontal="4dp"
+                    android:background="@drawable/bg_metric_chip">
+
+                    <TextView
+                        android:id="@+id/tvEventValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary"
+                        android:text="0" />
+
+                    <TextView
+                        android:id="@+id/tvEventLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="10sp"
+                        android:textColor="@color/text_secondary"
+                        android:text="Event" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Row 5: Tombol Detail -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnViewDetails"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="5"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:textColor="?android:attr/textColorPrimary" />
+                android:layout_height="36dp"
+                android:text="Lihat Laporan"
+                android:textSize="12sp"
+                android:paddingHorizontal="16dp"
+                app:cornerRadius="6dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
         </LinearLayout>
-
-        <Button
-            android:id="@+id/btnViewDetails"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/view_details"
-            android:layout_marginTop="8dp"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
     </LinearLayout>
 </androidx.cardview.widget.CardView>

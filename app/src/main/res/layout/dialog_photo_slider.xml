@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    dialog_photo_slider.xml
+
+    Issue #5: tambah tvStatus untuk menampilkan status validasi file:
+    - ✓ 128 KB           → file valid, hijau
+    - ⚠️ File kosong      → 0 bytes, oranye
+    - ❌ File tidak ada   → merah
+    - ❌ Error decode     → merah
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -24,19 +33,34 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:visibility="gone" />
+
     </FrameLayout>
 
-    <!-- Counter & STA -->
+    <!-- Status validasi file — Issue #5 -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="4dp"
+        android:paddingBottom="2dp"
+        android:paddingHorizontal="4dp"
+        android:textSize="11sp"
+        android:gravity="end"
+        android:textColor="@color/text_secondary" />
+
+    <!-- Counter, STA & caption — Issue #3 (multiline) -->
     <TextView
         android:id="@+id/tvCounter"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        android:paddingTop="8dp"
+        android:gravity="start"
+        android:paddingTop="6dp"
         android:paddingBottom="4dp"
-        android:textSize="13sp"
+        android:textSize="12sp"
         android:textColor="@color/text_primary"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:maxLines="4"
+        android:ellipsize="end" />
 
     <!-- Navigasi Prev / Next -->
     <LinearLayout
@@ -62,6 +86,7 @@
             android:layout_weight="1"
             android:text="@string/next"
             android:layout_marginStart="4dp" />
+
     </LinearLayout>
 
 </LinearLayout>

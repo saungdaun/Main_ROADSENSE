@@ -447,7 +447,6 @@ class SurveyEngine @Inject constructor(
                 gpsLat       = location.latitude,
                 gpsLng       = location.longitude,
                 sta          = formatSta(currentDistanceValue.toInt()),
-                notes        = notes ?: "",
                 createdAt    = System.currentTimeMillis()
             )
             surveyRepository.insertDistressItem(item)
