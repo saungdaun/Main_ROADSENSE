@@ -11,29 +11,95 @@ import zaujaani.roadsensebasic.data.repository.SessionWithCount
 @Dao
 interface SessionDao {
 
+    // ─────────────────────────────────────────────
+    // SESSION CRUD
+    // ─────────────────────────────────────────────
+
     @Insert
     suspend fun insertSession(session: SurveySession): Long
 
     @Update
     suspend fun updateSession(session: SurveySession)
 
-    @Query("SELECT * FROM survey_sessions ORDER BY startTime DESC")
-    fun getAllSessions(): Flow<List<SurveySession>>
-
-    @Query("SELECT * FROM survey_sessions WHERE id = :sessionId")
+    @Query("""
+        SELECT * 
+        FROM survey_sessions
+        WHERE id = :sessionId
+    """)
     suspend fun getSessionById(sessionId: Long): SurveySession?
 
     @Query("""
-        SELECT *, 
-               (SELECT COUNT(*) FROM road_events WHERE sessionId = survey_sessions.id) as eventCount 
-        FROM survey_sessions 
+        DELETE FROM survey_sessions 
+        WHERE id = :sessionId
+    """)
+    suspend fun deleteSessionById(sessionId: Long)
+
+    // ─────────────────────────────────────────────
+    // SESSION LIST SUMMARY (PRO VERSION ⭐)
+    // ─────────────────────────────────────────────
+
+    @Query("""
+        SELECT 
+            survey_sessions.*,
+
+            -- Event summary
+            (SELECT COUNT(*) 
+             FROM road_events 
+             WHERE road_events.sessionId = survey_sessions.id) 
+             AS eventCount,
+
+            -- Photo count
+            (SELECT COUNT(*) 
+             FROM road_events 
+             WHERE road_events.sessionId = survey_sessions.id
+             AND road_events.eventType = 'PHOTO')
+             AS photoCount,
+
+            -- Audio count
+            (SELECT COUNT(*) 
+             FROM road_events 
+             WHERE road_events.sessionId = survey_sessions.id
+             AND road_events.eventType = 'VOICE')
+             AS audioCount
+
+        FROM survey_sessions
         ORDER BY startTime DESC
     """)
     fun getSessionsWithCount(): Flow<List<SessionWithCount>>
 
-    @Query("DELETE FROM survey_sessions WHERE id = :sessionId")
-    suspend fun deleteSessionById(sessionId: Long)
+    // ─────────────────────────────────────────────
+    // SESSION LIST BASIC
+    // ─────────────────────────────────────────────
 
-    @Query("UPDATE survey_sessions SET endTime = :endTime, totalDistance = :totalDistance, avgConfidence = :avgConfidence, endLat = :endLat, endLng = :endLng WHERE id = :sessionId")
-    suspend fun updateSessionEnd(sessionId: Long, endTime: Long, totalDistance: Double, avgConfidence: Int, endLat: Double, endLng: Double)
+    @Query("""
+        SELECT * 
+        FROM survey_sessions 
+        ORDER BY startTime DESC
+    """)
+    fun getAllSessions(): Flow<List<SurveySession>>
+
+    // ─────────────────────────────────────────────
+    // SESSION END UPDATE
+    // ─────────────────────────────────────────────
+
+    @Query("""
+        UPDATE survey_sessions 
+        SET 
+            endTime = :endTime,
+            totalDistance = :totalDistance,
+            avgConfidence = :avgConfidence,
+            endLat = :endLat,
+            endLng = :endLng,
+            durationMinutes = :durationMinutes
+        WHERE id = :sessionId
+    """)
+    suspend fun updateSessionEnd(
+        sessionId: Long,
+        endTime: Long,
+        totalDistance: Double,
+        avgConfidence: Int,
+        endLat: Double,
+        endLng: Double,
+        durationMinutes: Long
+    )
 }

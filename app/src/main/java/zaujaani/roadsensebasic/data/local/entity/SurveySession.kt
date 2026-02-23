@@ -11,6 +11,7 @@ data class SurveySession(
 
     val roadName: String = "",
     val surveyorName: String = "",
+
     val mode: SurveyMode = SurveyMode.GENERAL,
 
     val startTime: Long,
@@ -21,14 +22,17 @@ data class SurveySession(
     val totalDistance: Double = 0.0,
     val avgConfidence: Int = 0,
 
-    // SDI result
+    // ── Survey Results ──
     val avgSdi: Int = 0,
-
-    // PCI result — -1 = belum dihitung / bukan sesi PCI  ← BARU
     val avgPci: Int = -1,
 
+    // ── Location ──
     val startLat: Double = 0.0,
     val startLng: Double = 0.0,
     val endLat: Double = 0.0,
-    val endLng: Double = 0.0
+    val endLng: Double = 0.0,
+
+    // ── Duration ──
+    val durationMinutes: Long = 0,
+
 )

@@ -285,5 +285,5 @@
     <string name="delete_session_confirm">Data survey ini akan dihapus permanen. Lanjutkan?</string>
     <string name="session_options">Pilihan Sesi</string>
     <string name="recording_active">⏺ Merekam suara...</string>
-    <string name="segment_badge">Segmen %1$d</string>
+    <string name="segment_badge">Segmen #%1$d — %2$s</string>
 </resources>

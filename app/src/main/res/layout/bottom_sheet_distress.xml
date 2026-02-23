@@ -70,6 +70,7 @@
                 android:layout_height="wrap_content"
                 android:inputType="none"
                 android:focusable="false"
+                android:hint="Jenis Kerusakan"
                 tools:text="Lubang" />
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -108,6 +109,7 @@
                 android:layout_height="wrap_content"
                 android:inputType="none"
                 android:focusable="false"
+                android:hint="Tingkat Keparahan"
                 tools:text="Sedang" />
         </com.google.android.material.textfield.TextInputLayout>
 

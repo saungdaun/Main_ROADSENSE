@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 10,
-    "identityHash": "596fe35883ba1087d8b311eb6da53cad",
+    "identityHash": "01193310deab6d222a0c34f989f6ff8b",
     "entities": [
       {
         "tableName": "telemetry_raw",
@@ -151,7 +151,7 @@
       },
       {
         "tableName": "survey_sessions",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `roadName` TEXT NOT NULL, `surveyorName` TEXT NOT NULL, `mode` TEXT NOT NULL, `startTime` INTEGER NOT NULL, `endTime` INTEGER, `deviceModel` TEXT NOT NULL, `totalDistance` REAL NOT NULL, `avgConfidence` INTEGER NOT NULL, `avgSdi` INTEGER NOT NULL, `avgPci` INTEGER NOT NULL, `startLat` REAL NOT NULL, `startLng` REAL NOT NULL, `endLat` REAL NOT NULL, `endLng` REAL NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `roadName` TEXT NOT NULL, `surveyorName` TEXT NOT NULL, `mode` TEXT NOT NULL, `startTime` INTEGER NOT NULL, `endTime` INTEGER, `deviceModel` TEXT NOT NULL, `totalDistance` REAL NOT NULL, `avgConfidence` INTEGER NOT NULL, `avgSdi` INTEGER NOT NULL, `avgPci` INTEGER NOT NULL, `startLat` REAL NOT NULL, `startLng` REAL NOT NULL, `endLat` REAL NOT NULL, `endLng` REAL NOT NULL, `durationMinutes` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -241,6 +241,12 @@
             "fieldPath": "endLng",
             "columnName": "endLng",
             "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMinutes",
+            "columnName": "durationMinutes",
+            "affinity": "INTEGER",
             "notNull": true
           }
         ],
@@ -1103,7 +1109,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '596fe35883ba1087d8b311eb6da53cad')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '01193310deab6d222a0c34f989f6ff8b')"
     ]
   }
 }

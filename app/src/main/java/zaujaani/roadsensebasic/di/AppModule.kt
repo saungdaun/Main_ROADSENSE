@@ -18,6 +18,7 @@ import zaujaani.roadsensebasic.domain.engine.*
 import zaujaani.roadsensebasic.gateway.BluetoothGateway
 import zaujaani.roadsensebasic.gateway.GPSGateway
 import zaujaani.roadsensebasic.gateway.SensorGateway
+import zaujaani.roadsensebasic.util.sensor.GpsConfidenceFilter
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -45,8 +46,11 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideGPSGateway(@ApplicationContext context: Context): GPSGateway {
-        return GPSGateway(context)
+    fun provideGPSGateway(
+        @ApplicationContext context: Context,
+        gpsConfidenceFilter: GpsConfidenceFilter
+    ): GPSGateway {
+        return GPSGateway(context, gpsConfidenceFilter)
     }
 
     @Provides
@@ -84,8 +88,14 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun providePCICalculator(): PCICalculator {           // ← BARU
+    fun providePCICalculator(): PCICalculator {
         return PCICalculator()
+    }
+
+    @Provides
+    @Singleton
+    fun provideGpsConfidenceFilter(): GpsConfidenceFilter {
+        return GpsConfidenceFilter()
     }
 
     @Provides
@@ -104,7 +114,8 @@ object AppModule {
         vibrationAnalyzer: VibrationAnalyzer,
         confidenceCalculator: ConfidenceCalculator,
         sdiCalculator: SDICalculator,
-        pciCalculator: PCICalculator,                  // ← BARU
+        pciCalculator: PCICalculator,
+        gpsConfidenceFilter: GpsConfidenceFilter,   // ← parameter ditambahkan
         @Named("applicationScope") externalScope: CoroutineScope
     ): SurveyEngine {
         return SurveyEngine(
@@ -114,7 +125,8 @@ object AppModule {
             vibrationAnalyzer    = vibrationAnalyzer,
             confidenceCalculator = confidenceCalculator,
             sdiCalculator        = sdiCalculator,
-            pciCalculator        = pciCalculator,      // ← BARU
+            pciCalculator        = pciCalculator,
+            gpsConfidenceFilter  = gpsConfidenceFilter,
             externalScope        = externalScope
         )
     }

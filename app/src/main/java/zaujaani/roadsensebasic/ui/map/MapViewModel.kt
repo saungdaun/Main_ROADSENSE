@@ -23,7 +23,18 @@ import zaujaani.roadsensebasic.gateway.GPSGateway
 import zaujaani.roadsensebasic.service.SurveyForegroundService
 import zaujaani.roadsensebasic.util.Constants
 import zaujaani.roadsensebasic.util.PreferencesManager
+import zaujaani.roadsensebasic.util.sensor.SensorFusionProcessor
 import javax.inject.Inject
+
+/**
+ * Data class untuk menyimpan konfigurasi threshold dalam satu paket.
+ * Memudahkan observasi perubahan dan kalibrasi dinamis.
+ */
+data class ThresholdConfig(
+    val baik: Float,
+    val sedang: Float,
+    val rusakRingan: Float
+)
 
 /**
  * MapViewModel — UI state hanya.
@@ -41,6 +52,9 @@ class MapViewModel @Inject constructor(
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
 
+    // Sensor fusion untuk menghaluskan data getaran
+    private val sensorFusionProcessor = SensorFusionProcessor()
+
     // ── Location & Speed (UI display only) ────────────────────────────────
     private val _location = MutableStateFlow<Location?>(null)
     val location: StateFlow<Location?> = _location.asStateFlow()
@@ -50,7 +64,15 @@ class MapViewModel @Inject constructor(
 
     // ── Data dari engine (single source of truth) ─────────────────────────
     val distance: StateFlow<Double> = surveyEngine.currentDistance
+
+    // Vibration yang sudah difilter menggunakan sensor fusion
     val vibration: StateFlow<Float> = surveyEngine.currentVibration
+        .map { raw -> sensorFusionProcessor.fuseVibration(raw) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = 0f
+        )
 
     // ── Survey State ──────────────────────────────────────────────────────
     val isSurveying: StateFlow<Boolean> = surveyEngine.sessionState
@@ -72,7 +94,8 @@ class MapViewModel @Inject constructor(
     private val _currentSurface = MutableStateFlow(Surface.ASPAL)
     val currentSurface: StateFlow<Surface> = _currentSurface.asStateFlow()
 
-    // ── Thresholds ────────────────────────────────────────────────────────
+    // ── Thresholds (Individual Flows) ─────────────────────────────────────
+    // Tetap dipertahankan untuk kompatibilitas jika ada komponen UI yang menggunakannya.
     private val _thresholdBaik = MutableStateFlow(Constants.DEFAULT_THRESHOLD_BAIK)
     val thresholdBaik: StateFlow<Float> = _thresholdBaik.asStateFlow()
 
@@ -81,6 +104,24 @@ class MapViewModel @Inject constructor(
 
     private val _thresholdRusakRingan = MutableStateFlow(Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN)
     val thresholdRusakRingan: StateFlow<Float> = _thresholdRusakRingan.asStateFlow()
+
+    // ── Threshold Config Flow (Single Source untuk UI Modern) ─────────────
+    // Gabungan ketiga threshold – ideal untuk observasi reaktif (misal update chart).
+    val thresholdConfig: StateFlow<ThresholdConfig> = combine(
+        _thresholdBaik,
+        _thresholdSedang,
+        _thresholdRusakRingan
+    ) { baik, sedang, rusakRingan ->
+        ThresholdConfig(baik, sedang, rusakRingan)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = ThresholdConfig(
+            Constants.DEFAULT_THRESHOLD_BAIK,
+            Constants.DEFAULT_THRESHOLD_SEDANG,
+            Constants.DEFAULT_THRESHOLD_RUSAK_RINGAN
+        )
+    )
 
     // ── Distance trigger (dari engine) ────────────────────────────────────
     private val _distanceTrigger = MutableSharedFlow<Double>(extraBufferCapacity = 5)
@@ -117,10 +158,6 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Location tracking HANYA untuk UI display (peta, kecepatan).
-     * TIDAK memanggil surveyEngine.updateLocation() — itu tugas ForegroundService.
-     */
     fun startLocationTracking() {
         if (locationTrackingJob?.isActive == true) return
         locationTrackingJob = gpsGateway.getLocationFlow()
@@ -128,7 +165,6 @@ class MapViewModel @Inject constructor(
             .onEach { loc ->
                 _location.value = loc
                 _speed.value    = loc.speed
-                // ✅ TIDAK panggil surveyEngine.updateLocation() di sini!
             }
             .launchIn(viewModelScope)
     }
@@ -138,25 +174,20 @@ class MapViewModel @Inject constructor(
         locationTrackingJob = null
     }
 
-    // ── Survey Lifecycle ──────────────────────────────────────────────────
-
-    /**
-     * @param laneWidth lebar lajur dalam meter — hanya relevan untuk mode PCI.
-     *   Digunakan untuk kalkulasi sample area (segmentLength × laneWidth).
-     *   Default 3.7m (lebar lajur standar nasional Indonesia).
-     */
     fun startSurvey(
         surveyorName: String,
         roadName: String,
         mode: SurveyMode,
-        laneWidth: Double = 3.7                 // ← BARU: parameter opsional untuk PCI
+        laneWidth: Double = 3.7
     ) {
         viewModelScope.launch {
+            // Reset sensor fusion untuk survey baru
+            sensorFusionProcessor.reset()
             surveyEngine.startNewSession(
                 surveyorName = surveyorName,
                 roadName     = roadName,
                 mode         = mode,
-                laneWidth    = laneWidth         // ← BARU
+                laneWidth    = laneWidth
             )
             _currentCondition.value = Condition.BAIK
             _currentSurface.value   = Surface.ASPAL
@@ -191,8 +222,6 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    // ── Event Recording ───────────────────────────────────────────────────
-
     fun recordCondition(condition: Condition) {
         surveyEngine.recordConditionChange(condition)
         _currentCondition.value = condition
@@ -215,20 +244,14 @@ class MapViewModel @Inject constructor(
         _isRecording.value = recording
     }
 
-    // ── Validation ────────────────────────────────────────────────────────
-
     fun checkConditionConsistency(condition: Condition): Boolean =
         surveyEngine.checkConditionConsistency(condition)
-
-    // ── Helpers ───────────────────────────────────────────────────────────
 
     fun getCurrentDistance(): Double = surveyEngine.getCurrentDistance()
     fun getCurrentLat(): Double      = surveyEngine.getLastLocation()?.latitude ?: 0.0
     fun getCurrentLng(): Double      = surveyEngine.getLastLocation()?.longitude ?: 0.0
     fun getCurrentRoadName(): String = surveyEngine.roadName.value
-    fun getCurrentMode(): SurveyMode = surveyEngine.getCurrentMode()   // ← BARU: expose mode
-
-    // ── Foreground Service ────────────────────────────────────────────────
+    fun getCurrentMode(): SurveyMode = surveyEngine.getCurrentMode()
 
     private fun startForegroundService() {
         val intent = Intent(context, SurveyForegroundService::class.java).apply {
