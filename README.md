@@ -10,9 +10,9 @@ Built as a foundation toward scalable digital pavement management solutions.
 🗺 Field Survey, Mapping & PCI Evaluation
 
 <p align="center">
-  <img src="screenshots/map_1.png" width="220"/>
-  <img src="screenshots/survey_detail_screen.png" width="220"/>
-  <img src="screenshots/pci_2.png" width="220"/>
+  <img src="screenshots/Foto_1.png" width="220"/>
+  <img src="screenshots/Foto_2.png" width="220"/>
+  <img src="screenshots/Foto_3.png" width="220"/>
 </p>
 
 
