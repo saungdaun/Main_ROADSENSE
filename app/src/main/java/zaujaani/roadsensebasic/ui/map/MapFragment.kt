@@ -429,14 +429,15 @@ class MapFragment : Fragment() {
                 fabCondition.visibility = if (isGeneral) View.VISIBLE else View.GONE
                 fabSurface.visibility   = if (isGeneral) View.VISIBLE else View.GONE
 
-                // Tombol distress: HANYA untuk SDI / PCI
+                // Tombol distress: HANYA untuk SDI / PCI (akses ke BottomSheet)
                 fabAddDistress.visibility = if (isSdiOrPci) View.VISIBLE else View.GONE
 
-                // FIX: Kamera & Voice untuk SEMUA mode — termasuk SDI dan PCI
-                // Di SDI/PCI, foto juga bisa diambil dari FAB kamera (General event-photo),
-                // SELAIN dari dalam DistressBottomSheet per item kerusakan.
-                fabCamera.visibility = if (isSurveying) View.VISIBLE else View.GONE
-                fabVoice.visibility  = if (isSurveying) View.VISIBLE else View.GONE
+                // Kamera & Voice: HANYA untuk GENERAL.
+                // SDI/PCI sudah punya akses kamera + mic di dalam DistressBottomSheet,
+                // lengkap dengan watermark profesional per mode.
+                // Menampilkan FAB kamera di SDI/PCI hanya membingungkan surveyor.
+                fabCamera.visibility = if (isGeneral) View.VISIBLE else View.GONE
+                fabVoice.visibility  = if (isGeneral) View.VISIBLE else View.GONE
             } else {
                 fabCondition.visibility   = View.GONE
                 fabSurface.visibility     = View.GONE
