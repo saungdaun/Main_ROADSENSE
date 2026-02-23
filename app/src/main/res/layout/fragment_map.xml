@@ -17,16 +17,17 @@
     android:layout_height="match_parent">
 
     <!-- MAP: full-screen, lapisan terbawah -->
-    <org.osmdroid.views.MapView
-        android:id="@+id/mapView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
 
     <!-- ═══════════════════════════════════════════════
          STATUS BAR ATAS
          Speed | Jarak | Kondisi &amp; Permukaan
          + tvSegmentBadge (SDI/PCI mode)
          ═══════════════════════════════════════════════ -->
+    <org.osmdroid.views.MapView
+        android:id="@+id/mapView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -188,7 +189,7 @@
             android:layout_marginBottom="6dp"
             android:paddingHorizontal="14dp"
             android:paddingVertical="5dp"
-            android:textSize="11sp"
+            android:textSize="12sp"
             android:textStyle="bold"
             android:textColor="#4CAF50"
             android:background="@drawable/bg_chip_dark"
@@ -256,9 +257,10 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:contentDescription="Toggle orientasi"
+            app:backgroundTint="#744DBA"
             app:fabSize="mini"
-            app:srcCompat="@drawable/ic_compass"
-            app:backgroundTint="#CC2C2C2E"
+            app:maxImageSize="40dp"
+            app:srcCompat="@drawable/ic_menu_compass"
             app:tint="@color/white" />
 
         <!-- Toggle chart on/off -->
@@ -269,6 +271,7 @@
             android:layout_marginBottom="8dp"
             android:contentDescription="Toggle chart getaran"
             app:fabSize="mini"
+            app:maxImageSize="50dp"
             app:srcCompat="@drawable/ic_chart"
             app:backgroundTint="#CC2C2C2E"
             app:tint="@color/white" />
@@ -281,9 +284,10 @@
             android:layout_marginBottom="8dp"
             android:contentDescription="Pilih kondisi jalan"
             android:visibility="gone"
+            app:maxImageSize="40dp"
             app:fabSize="mini"
             app:srcCompat="@drawable/ic_condition"
-            app:backgroundTint="@color/primary"
+            app:backgroundTint="@color/orange_light"
             app:tint="@color/white" />
 
         <!-- Pilih Permukaan (hanya mode GENERAL) -->
@@ -294,6 +298,7 @@
             android:layout_marginBottom="8dp"
             android:contentDescription="Pilih jenis permukaan"
             android:visibility="gone"
+            app:maxImageSize="40dp"
             app:fabSize="mini"
             app:srcCompat="@drawable/ic_surface"
             app:backgroundTint="@color/primary"
@@ -307,10 +312,12 @@
             android:layout_marginBottom="8dp"
             android:contentDescription="Ambil foto dokumentasi"
             android:visibility="gone"
+            app:maxImageSize="40dp"
             app:fabSize="mini"
-            app:srcCompat="@drawable/ic_camera"
-            app:backgroundTint="@color/primary"
-            app:tint="@color/white" />
+            app:backgroundTint="@color/orange_light"
+            app:srcCompat="@android:drawable/ic_menu_camera"/>
+
+
 
         <!-- Voice / Rekam suara (semua mode saat survey aktif, toggle start/stop) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -320,6 +327,7 @@
             android:layout_marginBottom="8dp"
             android:contentDescription="Rekam suara / memo lapangan"
             android:visibility="gone"
+            app:maxImageSize="40dp"
             app:fabSize="mini"
             app:srcCompat="@drawable/ic_mic"
             app:backgroundTint="@color/primary"
@@ -336,9 +344,10 @@
             android:layout_marginBottom="8dp"
             android:contentDescription="Input distress SDI / PCI"
             android:visibility="gone"
+            app:maxImageSize="40dp"
             app:fabSize="mini"
-            app:srcCompat="@drawable/ic_add_distress"
-            app:backgroundTint="@color/orange"
+            app:srcCompat="@drawable/sharp_add_black_36"
+            app:backgroundTint="@color/error"
             app:tint="@color/white" />
 
         <!-- Stop / Selesai Survey -->
@@ -361,7 +370,8 @@
             android:layout_height="wrap_content"
             android:contentDescription="Mulai atau pause survey"
             app:fabSize="normal"
-            app:srcCompat="@drawable/ic_play"
+            app:maxImageSize="40dp"
+            app:srcCompat="@android:drawable/ic_media_play"
             app:backgroundTint="@color/primary"
             app:tint="@color/white" />
 
