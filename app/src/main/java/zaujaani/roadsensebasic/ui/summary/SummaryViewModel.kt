@@ -27,6 +27,21 @@ import java.io.File
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
+/**
+ * RoadSense PRO UI Aggregation Model
+ *
+ * Gunakan ini untuk:
+ * - SummaryFragment
+ * - Export Report
+ * - Detail Dialog Rendering
+ *
+ * FIX FOTO:
+ * - generalPhotos → GENERAL mode (List<RoadEvent>)
+ * - sdiPhotos → SDI distress documentation (List<String>)
+ * - pciPhotos → PCI distress documentation (List<String>)
+ */
+
+
 @HiltViewModel
 class SummaryViewModel @Inject constructor(
     private val surveyRepository: SurveyRepository,
@@ -53,6 +68,7 @@ class SummaryViewModel @Inject constructor(
             try {
                 surveyRepository.getSessionsWithCount().collect { list ->
                     _sessions.value = list
+                    Timber.d("Loaded ${list.size} sessions")
                     _isLoading.value = false
                 }
             } catch (e: Exception) {
@@ -68,13 +84,16 @@ class SummaryViewModel @Inject constructor(
             _isLoading.value = true
             try {
                 val session = surveyRepository.getSessionById(sessionId) ?: run {
+                    Timber.w("Session $sessionId not found")
                     _sessionDetail.value = null
                     return@launch
                 }
 
-                val telemetries     = telemetryRepository.getTelemetryForSessionOnce(sessionId)
-                val events          = surveyRepository.getEventsForSession(sessionId)
+                val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
+                val events      = surveyRepository.getEventsForSession(sessionId)
+
                 val totalDistance   = session.totalDistance
+                // 🔧 Perbaikan: gunakan current time jika session belum berakhir
                 val durationMinutes = ((session.endTime ?: System.currentTimeMillis()) - session.startTime) / 60000
 
                 val avgConfidence = if (telemetries.isNotEmpty()) {
@@ -85,7 +104,7 @@ class SummaryViewModel @Inject constructor(
                 val photoCount = events.count { it.eventType == EventType.PHOTO }
                 val audioCount = events.count { it.eventType == EventType.VOICE }
 
-                // Distribusi kondisi & permukaan
+                // Hitung distribusi kondisi & permukaan dari telemetri
                 val conditionMap = mutableMapOf<String, Double>()
                 val surfaceMap   = mutableMapOf<String, Double>()
                 if (telemetries.size >= 2) {
@@ -108,37 +127,38 @@ class SummaryViewModel @Inject constructor(
                 val mode = session.mode
 
                 // ── SDI data ──────────────────────────────────────────────
-                val segmentsSdi = if (mode == SurveyMode.SDI)
+                val segmentsSdi = if (mode == SurveyMode.SDI) {
                     surveyRepository.getSegmentSdiForSessionOnce(sessionId)
-                else emptyList()
+                } else emptyList()
 
-                val distressItems = if (mode == SurveyMode.SDI)
+                val distressItems = if (mode == SurveyMode.SDI) {
                     surveyRepository.getDistressForSession(sessionId)
-                else emptyList()
+                } else emptyList()
 
-                val averageSdi = if (segmentsSdi.isNotEmpty())
+                val averageSdi = if (segmentsSdi.isNotEmpty()) {
                     segmentsSdi.map { it.sdiScore }.average().toInt()
-                else 0
+                } else 0
 
                 // ── PCI data ──────────────────────────────────────────────
-                val segmentsPci = if (mode == SurveyMode.PCI)
+                val segmentsPci = if (mode == SurveyMode.PCI) {
                     surveyRepository.getSegmentPciForSessionOnce(sessionId)
-                else emptyList()
+                } else emptyList()
 
-                val pciDistressItems = if (mode == SurveyMode.PCI)
+                val pciDistressItems = if (mode == SurveyMode.PCI) {
                     surveyRepository.getPciDistressForSession(sessionId)
-                else emptyList()
+                } else emptyList()
 
                 val averagePci = if (segmentsPci.isNotEmpty()) {
-                    segmentsPci.filter { it.pciScore >= 0 }.map { it.pciScore }
+                    segmentsPci.filter { it.pciScore >= 0 }
+                        .map { it.pciScore }
                         .let { scores -> if (scores.isNotEmpty()) scores.average().toInt() else -1 }
                 } else session.avgPci
 
                 val pciRating = if (averagePci >= 0) PCIRating.fromScore(averagePci) else null
 
-                // ── Foto per kategori (raw, untuk backward compat & export) ──
+                // ⭐ KUMPULKAN FOTO BERDASARKAN MODE + CEK KEBERADAAN FILE
                 val generalPhotos = events
-                    .filter { it.eventType == EventType.PHOTO && it.value.isNotBlank() && File(it.value).exists() }
+                    .filter { it.eventType == EventType.PHOTO && it.value.isNotBlank() }
 
                 val sdiPhotos = distressItems
                     .mapNotNull { it.photoPath }
@@ -148,13 +168,65 @@ class SummaryViewModel @Inject constructor(
                     .mapNotNull { it.photoPath }
                     .filter { it.isNotBlank() && File(it).exists() }
 
-                // ⭐ BUILD allPhotos — gabungan semua sumber, semua mode
-                val allPhotos = buildAllPhotos(
-                    mode             = mode,
-                    generalPhotos    = generalPhotos,
-                    distressItems    = distressItems,
-                    pciDistressItems = pciDistressItems
-                )
+                // ── allPhotos: list terpadu dengan metadata lengkap (Issue #3) ──
+                // Dipakai di photo slider untuk caption GPS + timestamp + distress info.
+                // Build sekali di sini, Fragment tinggal pakai.
+                val allPhotos: List<PhotoItem> = buildList {
+                    // SDI distress photos
+                    addAll(distressItems
+                        .filter { it.photoPath.isNotBlank() && File(it.photoPath).exists() }
+                        .map { item ->
+                            PhotoItem(
+                                path         = item.photoPath,
+                                label        = "${item.type.displayName} (${item.severity.name}) | SDI",
+                                sta          = item.sta,
+                                source       = PhotoItem.Source.DISTRESS,
+                                latitude     = item.gpsLat,
+                                longitude    = item.gpsLng,
+                                timestamp    = item.createdAt,
+                                distressType = item.type.displayName,
+                                severity     = item.severity.name
+                            )
+                        }
+                    )
+                    // PCI distress photos
+                    addAll(pciDistressItems
+                        .filter { it.photoPath.isNotBlank() && File(it.photoPath).exists() }
+                        .map { item ->
+                            PhotoItem(
+                                path         = item.photoPath,
+                                label        = "${item.type.displayName} (${item.severity.name}) | PCI",
+                                sta          = item.sta,
+                                notes        = item.notes,
+                                source       = PhotoItem.Source.DISTRESS,
+                                latitude     = item.gpsLat,
+                                longitude    = item.gpsLng,
+                                timestamp    = item.createdAt,
+                                distressType = item.type.displayName,
+                                severity     = item.severity.name
+                            )
+                        }
+                    )
+                    // General / FAB kamera — semua mode
+                    addAll(generalPhotos
+                        .filter { File(it.value).exists() }
+                        .map { event ->
+                            val km  = event.distance.toInt() / 1000
+                            val m   = event.distance.toInt() % 1000
+                            val sta = "STA %d+%03d".format(km, m)
+                            PhotoItem(
+                                path      = event.value,
+                                label     = "Foto Lapangan | Umum",
+                                sta       = sta,
+                                notes     = event.notes ?: "",
+                                source    = PhotoItem.Source.GENERAL,
+                                latitude  = event.latitude,
+                                longitude = event.longitude,
+                                timestamp = event.timestamp
+                            )
+                        }
+                    )
+                }
 
                 val detail = SessionDetailUi(
                     session               = session,
@@ -177,11 +249,10 @@ class SummaryViewModel @Inject constructor(
                     conditionDistribution = conditionMap,
                     surfaceDistribution   = surfaceMap,
                     photoCount            = photoCount,
-                    audioCount            = audioCount
+                    audioCount            = audioCount,
                 )
                 _sessionDetail.value = detail
-                Timber.d("Detail loaded: sessionId=$sessionId mode=$mode photos=${allPhotos.size}")
-
+                Timber.d("Loaded detail: sessionId=$sessionId mode=$mode avgSdi=$averageSdi avgPci=$averagePci")
             } catch (e: Exception) {
                 Timber.e(e, "Gagal memuat detail sesi $sessionId")
                 _sessionDetail.value = null
@@ -191,107 +262,12 @@ class SummaryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Bangun daftar foto gabungan dari semua sumber.
-     *
-     * Prioritas tampil:
-     * 1. Foto dari distress items (paling relevan untuk SDI/PCI)
-     * 2. Foto dari FAB kamera umum (overview lapangan)
-     *
-     * Semua mode mendapatkan foto FAB kamera umum.
-     * SDI/PCI mendapatkan foto distress lebih dulu.
-     */
-    private fun buildAllPhotos(
-        mode: SurveyMode,
-        generalPhotos: List<RoadEvent>,
-        distressItems: List<DistressItem>,
-        pciDistressItems: List<PCIDistressItem>
-    ): List<PhotoItem> {
-        val list = mutableListOf<PhotoItem>()
-
-        when (mode) {
-            SurveyMode.SDI -> {
-                // 1. Foto dari setiap distress item SDI
-                distressItems.forEach { item ->
-                    val path = item.photoPath ?: return@forEach
-                    if (path.isBlank() || !File(path).exists()) return@forEach
-                    list += PhotoItem(
-                        path   = path,
-                        label  = "${item.type.displayName} (${item.severity.name}) | SDI",
-                        sta    = item.sta,
-                        notes  = item.notes ?: "",
-                        source = PhotoItem.Source.DISTRESS
-                    )
-                }
-                // 2. Foto umum dari FAB kamera saat survey SDI
-                generalPhotos.forEach { event ->
-                    if (!File(event.value).exists()) return@forEach
-                    list += PhotoItem(
-                        path   = event.value,
-                        label  = "Foto Lapangan | SDI",
-                        sta    = formatSta(event.distance.toInt()),
-                        notes  = event.notes ?: "",
-                        source = PhotoItem.Source.GENERAL
-                    )
-                }
-            }
-
-            SurveyMode.PCI -> {
-                // 1. Foto dari setiap distress item PCI
-                pciDistressItems.forEach { item ->
-                    val path = item.photoPath ?: return@forEach
-                    if (path.isBlank() || !File(path).exists()) return@forEach
-                    list += PhotoItem(
-                        path   = path,
-                        label  = "${item.type.displayName} (${item.severity.name}) | PCI",
-                        sta    = item.sta,
-                        notes  = item.notes,
-                        source = PhotoItem.Source.DISTRESS
-                    )
-                }
-                // 2. Foto umum dari FAB kamera saat survey PCI
-                generalPhotos.forEach { event ->
-                    if (!File(event.value).exists()) return@forEach
-                    list += PhotoItem(
-                        path   = event.value,
-                        label  = "Foto Lapangan | PCI",
-                        sta    = formatSta(event.distance.toInt()),
-                        notes  = event.notes ?: "",
-                        source = PhotoItem.Source.GENERAL
-                    )
-                }
-            }
-
-            SurveyMode.GENERAL -> {
-                generalPhotos.forEach { event ->
-                    if (!File(event.value).exists()) return@forEach
-                    list += PhotoItem(
-                        path   = event.value,
-                        label  = "Foto Dokumentasi",
-                        sta    = formatSta(event.distance.toInt()),
-                        notes  = event.notes ?: "",
-                        source = PhotoItem.Source.GENERAL
-                    )
-                }
-            }
-        }
-
-        return list
-    }
-
-    private fun formatSta(meters: Int): String {
-        val km = meters / 1000
-        val m  = meters % 1000
-        return "STA %d+%03d".format(km, m)
-    }
-
-    // ── Session operations ─────────────────────────────────────────────────
-
     fun deleteSession(session: SurveySession) {
         viewModelScope.launch {
             try {
                 telemetryRepository.deleteBySession(session.id)
                 surveyRepository.deleteSessionById(session.id)
+                Timber.d("Deleted session ${session.id}")
                 loadSessions()
             } catch (e: Exception) {
                 Timber.e(e, "Gagal menghapus sesi ${session.id}")
@@ -299,7 +275,7 @@ class SummaryViewModel @Inject constructor(
         }
     }
 
-    // ── Export ─────────────────────────────────────────────────────────────
+    // ── Export ────────────────────────────────────────────────────────────
 
     fun exportSessionToGpx(sessionId: Long, callback: (File?) -> Unit) {
         viewModelScope.launch {
@@ -308,7 +284,13 @@ class SummaryViewModel @Inject constructor(
                 val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
                 if (telemetries.isEmpty()) return@launch callback(null)
                 val events = surveyRepository.getEventsForSession(sessionId)
-                callback(FileExporter.exportToGpx(context, "RoadSense_${session.startTime}", telemetries, events))
+                val file = FileExporter.exportToGpx(
+                    context     = context,
+                    sessionName = "RoadSense_${session.startTime}",
+                    telemetries = telemetries,
+                    events      = events
+                )
+                callback(file)
             } catch (e: Exception) {
                 Timber.e(e, "GPX export error")
                 callback(null)
@@ -322,7 +304,14 @@ class SummaryViewModel @Inject constructor(
                 val session     = surveyRepository.getSessionById(sessionId) ?: return@launch callback(null)
                 val telemetries = telemetryRepository.getTelemetryForSessionOnce(sessionId)
                 val events      = surveyRepository.getEventsForSession(sessionId)
-                callback(FileExporter.exportToCsv(context, "RoadSense_${session.startTime}", session, telemetries, events))
+                val file = FileExporter.exportToCsv(
+                    context     = context,
+                    sessionName = "RoadSense_${session.startTime}",
+                    session     = session,
+                    telemetries = telemetries,
+                    events      = events
+                )
+                callback(file)
             } catch (e: Exception) {
                 Timber.e(e, "CSV export error")
                 callback(null)
@@ -338,14 +327,26 @@ class SummaryViewModel @Inject constructor(
                 val events      = surveyRepository.getEventsForSession(sessionId)
                 val mode        = session.mode
 
-                val segmentsSdi      = if (mode == SurveyMode.SDI) surveyRepository.getSegmentSdiForSessionOnce(sessionId) else emptyList()
-                val distressItems    = if (mode == SurveyMode.SDI) surveyRepository.getDistressForSession(sessionId) else emptyList()
-                val segmentsPci      = if (mode == SurveyMode.PCI) surveyRepository.getSegmentPciForSessionOnce(sessionId) else emptyList()
-                val pciDistressItems = if (mode == SurveyMode.PCI) surveyRepository.getPciDistressForSession(sessionId) else emptyList()
+                val segmentsSdi = if (mode == SurveyMode.SDI) {
+                    surveyRepository.getSegmentSdiForSessionOnce(sessionId)
+                } else emptyList()
 
-                val avgConfidence = if (telemetries.isNotEmpty())
-                    telemetries.map { (100 - (it.gpsAccuracy * 2)).coerceIn(0f, 100f).toInt() }.average().roundToInt()
-                else 0
+                val distressItems = if (mode == SurveyMode.SDI) {
+                    surveyRepository.getDistressForSession(sessionId)
+                } else emptyList()
+
+                val segmentsPci = if (mode == SurveyMode.PCI) {
+                    surveyRepository.getSegmentPciForSessionOnce(sessionId)
+                } else emptyList()
+
+                val pciDistressItems = if (mode == SurveyMode.PCI) {
+                    surveyRepository.getPciDistressForSession(sessionId)
+                } else emptyList()
+
+                val avgConfidence = if (telemetries.isNotEmpty()) {
+                    telemetries.map { (100 - (it.gpsAccuracy * 2)).coerceIn(0f, 100f).toInt() }
+                        .average().roundToInt()
+                } else 0
 
                 val conditionMap = mutableMapOf<String, Double>()
                 val surfaceMap   = mutableMapOf<String, Double>()
@@ -366,7 +367,7 @@ class SummaryViewModel @Inject constructor(
                     }
                 }
 
-                callback(PDFExporter.exportToPdf(
+                val file = PDFExporter.exportToPdf(
                     context               = context,
                     session               = session,
                     telemetries           = telemetries,
@@ -377,7 +378,8 @@ class SummaryViewModel @Inject constructor(
                     surfaceDistribution   = surfaceMap,
                     segmentsPci           = segmentsPci,
                     pciDistressItems      = pciDistressItems
-                ))
+                )
+                callback(file)
             } catch (e: Exception) {
                 Timber.e(e, "PDF export error")
                 callback(null)
