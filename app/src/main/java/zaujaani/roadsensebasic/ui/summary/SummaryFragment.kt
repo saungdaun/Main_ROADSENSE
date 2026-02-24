@@ -9,7 +9,9 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import com.google.android.material.snackbar.Snackbar
 import androidx.core.graphics.toColorInt
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
@@ -88,6 +90,16 @@ class SummaryFragment : Fragment() {
 
         viewModel.sessionDetail.observe(viewLifecycleOwner) { detail ->
             detail ?: return@observe
+
+            // Cek apakah ini response untuk pending navigasi ke Photo Analysis
+            val pending = pendingPhotoAnalysisSession
+            if (pending != null && detail.session.id == pending.id) {
+                pendingPhotoAnalysisSession = null
+                doNavigateToPhotoAnalysis(pending, detail.allPhotos)
+                return@observe
+            }
+
+            // Normal: tampilkan dialog detail
             when (detail.mode) {
                 SurveyMode.SDI     -> showSdiDetailDialog(detail)
                 SurveyMode.PCI     -> showPciDetailDialog(detail)
@@ -489,6 +501,7 @@ class SummaryFragment : Fragment() {
             getString(R.string.export_gpx),
             getString(R.string.export_csv),
             getString(R.string.export_pdf),
+            "🔍 Analisis Foto AI",           // ← BARU: post-survey photo analysis
             getString(R.string.delete)
         )
         MaterialAlertDialogBuilder(requireContext())
@@ -499,11 +512,32 @@ class SummaryFragment : Fragment() {
                     1 -> exportSession(session, "gpx")
                     2 -> exportSession(session, "csv")
                     3 -> exportSession(session, "pdf")
-                    4 -> confirmDelete(session)
+                    4 -> navigateToPhotoAnalysis(session)
+                    5 -> confirmDelete(session)
                 }
             }
             .show()
     }
+
+    /**
+     * Navigasi ke PhotoAnalysisFragment untuk session ini.
+     * allPhotos perlu di-load dulu via ViewModel, karena butuh SessionDetailUi.
+     * Kalau detail sudah ada (user baru saja buka dialog) langsung navigasi.
+     * Kalau belum, load dulu.
+     */
+    private fun navigateToPhotoAnalysis(session: SurveySession) {
+        val existingDetail = viewModel.sessionDetail.value
+        if (existingDetail?.session?.id == session.id) {
+            // Data sudah ada — langsung navigasi
+            doNavigateToPhotoAnalysis(session, existingDetail.allPhotos)
+        } else {
+            // Load dulu, observer akan trigger navigasi
+            pendingPhotoAnalysisSession = session
+            viewModel.loadSessionDetail(session.id)
+        }
+    }
+
+    private var pendingPhotoAnalysisSession: SurveySession? = null
 
     private fun exportSession(session: SurveySession, format: String) {
         when (format) {
@@ -537,6 +571,20 @@ class SummaryFragment : Fragment() {
             .setPositiveButton(getString(R.string.delete)) { _, _ -> viewModel.deleteSession(session) }
             .setNegativeButton(getString(R.string.cancel), null)
             .show()
+    }
+
+    private fun doNavigateToPhotoAnalysis(session: SurveySession, photos: List<PhotoItem>) {
+        if (photos.isEmpty()) {
+            Snackbar.make(binding.root, "Session ini tidak memiliki foto untuk dianalisis", Snackbar.LENGTH_LONG).show()
+            return
+        }
+        val bundle = bundleOf(
+            "sessionId"   to session.id,
+            "roadName"    to session.roadName.ifBlank { "Sesi #${session.id}" },
+            "sessionMode" to session.mode.name
+        )
+        bundle.putParcelableArrayList("photoItems", ArrayList(photos))
+        findNavController().navigate(R.id.action_summaryFragment_to_photoAnalysisFragment, bundle)
     }
 
     // ══════════════════════════════════════════════════════════════════════

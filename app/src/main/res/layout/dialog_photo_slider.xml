@@ -1,20 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    dialog_photo_slider.xml
 
-    Issue #5: tambah tvStatus untuk menampilkan status validasi file:
-    - ✓ 128 KB           → file valid, hijau
-    - ⚠️ File kosong      → 0 bytes, oranye
-    - ❌ File tidak ada   → merah
-    - ❌ Error decode     → merah
--->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="8dp">
 
-    <!-- Foto + ProgressBar overlay -->
+
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="280dp">
@@ -36,7 +28,7 @@
 
     </FrameLayout>
 
-    <!-- Status validasi file — Issue #5 -->
+
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="match_parent"
@@ -48,7 +40,7 @@
         android:gravity="end"
         android:textColor="@color/text_secondary" />
 
-    <!-- Counter, STA & caption — Issue #3 (multiline) -->
+
     <TextView
         android:id="@+id/tvCounter"
         android:layout_width="match_parent"
@@ -62,7 +54,7 @@
         android:maxLines="4"
         android:ellipsize="end" />
 
-    <!-- Navigasi Prev / Next -->
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -1,5 +1,7 @@
 package zaujaani.roadsensebasic.ui.summary
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -7,13 +9,13 @@ import java.util.Locale
 /**
  * PhotoItem — Model foto terpadu untuk semua mode survey.
  *
- * FIX Issue #3: Tambah metadata GPS + timestamp + distress info.
- * Sebelumnya caption tidak cukup informatif untuk audit trail.
+ * @Parcelize: dibutuhkan untuk transfer via Bundle ke PhotoAnalysisFragment.
  *
  * Caption format (untuk slider):
  *   "3/12  |  GPS: -6.1234,106.8765  |  STA 0+150  |  Lubang (HIGH)  |  09:41:23
  *    📝 Catatan surveyor"
  */
+@Parcelize
 data class PhotoItem(
     val path: String,
 
@@ -56,8 +58,9 @@ data class PhotoItem(
      * Contoh: "LOW", "MEDIUM", "HIGH"
      */
     val severity: String = ""
-) {
-    enum class Source { DISTRESS, GENERAL }
+) : Parcelable {
+    @Parcelize
+    enum class Source : Parcelable { DISTRESS, GENERAL }
 
     /**
      * Caption lengkap untuk photo slider.

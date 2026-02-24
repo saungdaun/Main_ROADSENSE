@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Preview foto -->
+        <ImageView
+            android:id="@+id/ivPhoto"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:scaleType="centerCrop"
+            android:background="#222222"
+            android:contentDescription="Foto lapangan"/>
+
+        <!-- Metadata foto: STA, GPS, dll -->
+        <TextView
+            android:id="@+id/tvPhotoMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="STA 0+150 | GPS: -6.1234,106.8765"
+            android:textSize="11sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:paddingTop="8dp"
+            android:paddingBottom="4dp"/>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginVertical="8dp"/>
+
+        <!-- Status analisis -->
+        <TextView
+            android:id="@+id/tvAnalysisStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Belum dianalisis"
+            android:textSize="12sp"
+            android:paddingBottom="8dp"/>
+
+        <!-- Hasil deteksi -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="HASIL DETEKSI"
+            android:textSize="11sp"
+            android:textAllCaps="true"
+            android:textColor="?android:attr/textColorSecondary"/>
+
+        <TextView
+            android:id="@+id/tvAnalysisResult"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:paddingBottom="8dp"/>
+
+        <!-- Confidence bar -->
+        <TextView
+            android:id="@+id/tvConfidence"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textSize="12sp"
+            android:textColor="?android:attr/textColorSecondary"/>
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/progressConfidence"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp"
+            app:trackCornerRadius="4dp"/>
+
+        <!-- Deskripsi -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DESKRIPSI"
+            android:textSize="11sp"
+            android:textAllCaps="true"
+            android:textColor="?android:attr/textColorSecondary"/>
+
+        <TextView
+            android:id="@+id/tvDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textSize="13sp"
+            android:paddingTop="4dp"
+            android:paddingBottom="8dp"/>
+
+        <!-- Rekomendasi -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="REKOMENDASI"
+            android:textSize="11sp"
+            android:textAllCaps="true"
+            android:textColor="?android:attr/textColorSecondary"/>
+
+        <TextView
+            android:id="@+id/tvRecommendation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textSize="13sp"
+            android:paddingTop="4dp"/>
+
+    </LinearLayout>
+</ScrollView>

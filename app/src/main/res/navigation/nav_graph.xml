@@ -27,6 +27,49 @@
         <action
             android:id="@+id/action_summaryFragment_to_mapFragment"
             app:destination="@id/mapFragment" />
+        <!-- Navigasi ke halaman analisis foto -->
+        <action
+            android:id="@+id/action_summaryFragment_to_photoAnalysisFragment"
+            app:destination="@id/photoAnalysisFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right"/>
+    </fragment>
+
+    <!-- ── Photo Analysis — post-survey job ──────────────────────────── -->
+    <fragment
+        android:id="@+id/photoAnalysisFragment"
+        android:name="zaujaani.roadsensebasic.ui.analysis.PhotoAnalysisFragment"
+        android:label="Analisis Foto"
+        tools:layout="@layout/fragment_photo_analysis">
+
+        <!-- sessionId: wajib, ID sesi survey yang akan dianalisis -->
+        <argument
+            android:name="sessionId"
+            app:argType="long"
+            android:defaultValue="-1L" />
+
+        <!-- roadName: untuk judul halaman -->
+        <argument
+            android:name="roadName"
+            app:argType="string"
+            android:defaultValue="" />
+
+        <!-- sessionMode: "GENERAL" | "SDI" | "PCI" -->
+        <argument
+            android:name="sessionMode"
+            app:argType="string"
+            android:defaultValue="GENERAL" />
+
+        <!-- photoItems: dikirim via Bundle putParcelableArrayList -->
+        <!-- Tidak bisa jadi NavArg karena List<Parcelable> custom -->
+
+        <action
+            android:id="@+id/action_photoAnalysisFragment_to_summaryFragment"
+            app:destination="@id/summaryFragment"
+            app:popUpTo="@id/summaryFragment"
+            app:popUpToInclusive="false"/>
     </fragment>
 
     <fragment

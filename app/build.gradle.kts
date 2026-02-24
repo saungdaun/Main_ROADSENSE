@@ -1,12 +1,9 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-
     id("com.google.devtools.ksp")
-
     id("com.google.dagger.hilt.android")
     id("androidx.navigation.safeargs.kotlin")
-
     id("kotlin-parcelize")
 }
 
@@ -55,6 +52,11 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+    }
+
+    // Menambahkan aaptOptions agar file .tflite tidak dikompres
+    aaptOptions {
+        noCompress("tflite")
     }
 }
 
@@ -134,6 +136,11 @@ dependencies {
 
     // ---------------- PDF ----------------
     implementation("com.itextpdf:itext7-core:7.2.5")
+
+    // ---------------- TENSORFLOW LITE (untuk analisis foto) ----------------
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
     // ---------------- TEST ----------------
     testImplementation("junit:junit:4.13.2")

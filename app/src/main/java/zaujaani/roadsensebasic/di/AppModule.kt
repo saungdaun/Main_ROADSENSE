@@ -15,6 +15,7 @@ import zaujaani.roadsensebasic.data.repository.PhotoAnalysisRepository
 import zaujaani.roadsensebasic.data.repository.SurveyRepository
 import zaujaani.roadsensebasic.data.repository.TelemetryRepository
 import zaujaani.roadsensebasic.domain.engine.*
+import zaujaani.roadsensebasic.domain.engine.RoadDistressClassifier
 import zaujaani.roadsensebasic.gateway.BluetoothGateway
 import zaujaani.roadsensebasic.gateway.GPSGateway
 import zaujaani.roadsensebasic.gateway.SensorGateway
@@ -42,6 +43,12 @@ object AppModule {
     @Singleton
     fun provideSurveyRepository(db: RoadSenseDatabase): SurveyRepository {
         return SurveyRepository(db)
+    }
+
+    @Provides
+    @Singleton
+    fun provideGpsConfidenceFilter(): GpsConfidenceFilter {
+        return GpsConfidenceFilter()
     }
 
     @Provides
@@ -88,14 +95,8 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun providePCICalculator(): PCICalculator {
+    fun providePCICalculator(): PCICalculator {           // ← BARU
         return PCICalculator()
-    }
-
-    @Provides
-    @Singleton
-    fun provideGpsConfidenceFilter(): GpsConfidenceFilter {
-        return GpsConfidenceFilter()
     }
 
     @Provides
@@ -115,7 +116,7 @@ object AppModule {
         confidenceCalculator: ConfidenceCalculator,
         sdiCalculator: SDICalculator,
         pciCalculator: PCICalculator,
-        gpsConfidenceFilter: GpsConfidenceFilter,   // ← parameter ditambahkan
+        gpsConfidenceFilter: GpsConfidenceFilter,
         @Named("applicationScope") externalScope: CoroutineScope
     ): SurveyEngine {
         return SurveyEngine(
@@ -144,5 +145,13 @@ object AppModule {
         @ApplicationContext context: Context
     ): PhotoAnalysisRepository {
         return PhotoAnalysisRepository(dao, context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideRoadDistressClassifier(
+        @ApplicationContext context: Context
+    ): RoadDistressClassifier {
+        return RoadDistressClassifier(context).also { it.initialize() }
     }
 }
