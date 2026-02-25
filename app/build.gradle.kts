@@ -12,7 +12,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "zaujaani.roadsensebasic"
+        applicationId = "zaujaani.roadsensepro"
         minSdk = 28
         targetSdk = 34
 

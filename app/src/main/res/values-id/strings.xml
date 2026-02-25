@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App -->
-    <string name="app_name">RoadSense Basic</string>
+    <string name="app_name">RoadSense Pro</string>
 
     <!-- Drawer Header -->
     <string name="drawer_title">RoadSense Basic</string>
