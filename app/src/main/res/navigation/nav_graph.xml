@@ -5,6 +5,7 @@
     android:id="@+id/nav_graph"
     app:startDestination="@id/mapFragment">
 
+    <!-- ── Map ─────────────────────────────────────────────────────── -->
     <fragment
         android:id="@+id/mapFragment"
         android:name="zaujaani.roadsensebasic.ui.map.MapFragment"
@@ -20,6 +21,7 @@
             app:destination="@id/bluetoothFragment" />
     </fragment>
 
+    <!-- ── Summary ─────────────────────────────────────────────────── -->
     <fragment
         android:id="@+id/summaryFragment"
         android:name="zaujaani.roadsensebasic.ui.summary.SummaryFragment"
@@ -27,51 +29,41 @@
         <action
             android:id="@+id/action_summaryFragment_to_mapFragment"
             app:destination="@id/mapFragment" />
-        <!-- Navigasi ke halaman analisis foto -->
         <action
             android:id="@+id/action_summaryFragment_to_photoAnalysisFragment"
             app:destination="@id/photoAnalysisFragment"
             app:enterAnim="@anim/slide_in_right"
             app:exitAnim="@anim/slide_out_left"
             app:popEnterAnim="@anim/slide_in_left"
-            app:popExitAnim="@anim/slide_out_right"/>
+            app:popExitAnim="@anim/slide_out_right" />
     </fragment>
 
-    <!-- ── Photo Analysis — post-survey job ──────────────────────────── -->
+    <!-- ── Photo Analysis — post-survey job ────────────────────────── -->
     <fragment
         android:id="@+id/photoAnalysisFragment"
         android:name="zaujaani.roadsensebasic.ui.analysis.PhotoAnalysisFragment"
         android:label="Analisis Foto"
         tools:layout="@layout/fragment_photo_analysis">
-
-        <!-- sessionId: wajib, ID sesi survey yang akan dianalisis -->
         <argument
             android:name="sessionId"
             app:argType="long"
             android:defaultValue="-1L" />
-
-        <!-- roadName: untuk judul halaman -->
         <argument
             android:name="roadName"
             app:argType="string"
             android:defaultValue="" />
-
-        <!-- sessionMode: "GENERAL" | "SDI" | "PCI" -->
         <argument
             android:name="sessionMode"
             app:argType="string"
             android:defaultValue="GENERAL" />
-
-        <!-- photoItems: dikirim via Bundle putParcelableArrayList -->
-        <!-- Tidak bisa jadi NavArg karena List<Parcelable> custom -->
-
         <action
             android:id="@+id/action_photoAnalysisFragment_to_summaryFragment"
             app:destination="@id/summaryFragment"
             app:popUpTo="@id/summaryFragment"
-            app:popUpToInclusive="false"/>
+            app:popUpToInclusive="false" />
     </fragment>
 
+    <!-- ── Settings ────────────────────────────────────────────────── -->
     <fragment
         android:id="@+id/settingsFragment"
         android:name="zaujaani.roadsensebasic.ui.settings.SettingsFragment"
@@ -81,6 +73,7 @@
             app:destination="@id/mapFragment" />
     </fragment>
 
+    <!-- ── Bluetooth ────────────────────────────────────────────────── -->
     <fragment
         android:id="@+id/bluetoothFragment"
         android:name="zaujaani.roadsensebasic.ui.bluetooth.BluetoothFragment"
@@ -88,6 +81,17 @@
         tools:layout="@layout/fragment_bluetooth">
         <action
             android:id="@+id/action_bluetoothFragment_to_mapFragment"
+            app:destination="@id/mapFragment" />
+    </fragment>
+
+    <!-- ── About ────────────────────────────────────────────────────── -->
+    <fragment
+        android:id="@+id/aboutFragment"
+        android:name="zaujaani.roadsensebasic.ui.about.AboutFragment"
+        android:label="Tentang Aplikasi"
+        tools:layout="@layout/fragment_about">
+        <action
+            android:id="@+id/action_aboutFragment_to_mapFragment"
             app:destination="@id/mapFragment" />
     </fragment>
 

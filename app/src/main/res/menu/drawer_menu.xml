@@ -13,7 +13,8 @@
 
     <item
         android:id="@+id/action_photoAnalysisFragment"
-        android:title="Analyze Photos"/>
+        android:title="Analisis Foto AI"
+        android:icon="@android:drawable/ic_menu_camera" />
 
     <item
         android:id="@+id/settingsFragment"
@@ -24,5 +25,10 @@
         android:id="@+id/bluetoothFragment"
         android:icon="@drawable/ic_bluetooth"
         android:title="@string/menu_bluetooth" />
+
+    <item
+        android:id="@+id/aboutFragment"
+        android:title="Tentang Aplikasi"
+        android:icon="@android:drawable/ic_menu_info_details" />
 
 </menu>

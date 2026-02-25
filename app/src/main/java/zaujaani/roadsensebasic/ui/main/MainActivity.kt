@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.NavigationUI
+import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import zaujaani.roadsensebasic.R
 import zaujaani.roadsensebasic.databinding.ActivityMainBinding
@@ -22,9 +23,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var drawerToggle: ActionBarDrawerToggle
 
-    // ===============================
-    // Required Permissions
-    // ===============================
+    // ── Permissions ──────────────────────────────────────────────────────
+
     private val requiredPermissions: Array<String>
         get() {
             val permissions = mutableListOf(
@@ -33,23 +33,16 @@ class MainActivity : AppCompatActivity() {
                 Manifest.permission.CAMERA,
                 Manifest.permission.RECORD_AUDIO
             )
-
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 permissions.add(Manifest.permission.POST_NOTIFICATIONS)
             }
-
             return permissions.toTypedArray()
         }
 
-    // ===============================
-    // Permission Launcher
-    // ===============================
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-
-            val deniedPermissions = permissions.filterValues { !it }.keys
-
-            if (deniedPermissions.isNotEmpty()) {
+            val denied = permissions.filterValues { !it }.keys
+            if (denied.isNotEmpty()) {
                 Toast.makeText(
                     this,
                     "Some permissions are denied. App may not work properly.",
@@ -58,15 +51,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-    // ===============================
-    // onCreate
-    // ===============================
+    // ── Lifecycle ────────────────────────────────────────────────────────
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
         setSupportActionBar(binding.topAppBar)
 
         setupNavigation()
@@ -74,15 +64,12 @@ class MainActivity : AppCompatActivity() {
         setupBackPressedHandler()
     }
 
-    // ===============================
-    // Setup Navigation + Drawer
-    // ===============================
-    private fun setupNavigation() {
+    // ── Navigation ───────────────────────────────────────────────────────
 
+    private fun setupNavigation() {
         val navHostFragment =
             supportFragmentManager.findFragmentById(R.id.nav_host_fragment)
                     as NavHostFragment
-
         val navController = navHostFragment.navController
 
         drawerToggle = ActionBarDrawerToggle(
@@ -92,40 +79,54 @@ class MainActivity : AppCompatActivity() {
             R.string.app_name,
             R.string.app_name
         )
-
         binding.drawerLayout.addDrawerListener(drawerToggle)
         drawerToggle.syncState()
 
-        NavigationUI.setupWithNavController(
-            binding.navigationView,
-            navController
-        )
+        // Setup drawer — intercept item yang butuh handling khusus
+        binding.navigationView.setNavigationItemSelectedListener { menuItem ->
+            binding.drawerLayout.closeDrawers()
+
+            when (menuItem.itemId) {
+
+                // "Analisis Foto AI" di drawer → arahkan ke Summary dulu.
+                // User pilih session di Summary → long-press → Analisis Foto AI.
+                // Tidak bisa langsung ke PhotoAnalysisFragment karena butuh sessionId.
+                R.id.action_photoAnalysisFragment -> {
+                    navController.navigate(R.id.summaryFragment)
+                    Snackbar.make(
+                        binding.root,
+                        "Pilih sesi survey → tahan → Analisis Foto AI",
+                        Snackbar.LENGTH_LONG
+                    ).show()
+                    true
+                }
+
+                // Semua item lain dihandle NavigationUI biasa
+                else -> NavigationUI.onNavDestinationSelected(menuItem, navController)
+            }
+        }
+
+        // Update judul Toolbar saat destinasi berubah
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            supportActionBar?.title = destination.label
+        }
     }
 
-    // ===============================
-    // Check & Request Permissions
-    // ===============================
+    // ── Permissions ──────────────────────────────────────────────────────
+
     private fun checkAndRequestPermissions() {
-
-        val notGrantedPermissions = requiredPermissions.filter {
-            ContextCompat.checkSelfPermission(
-                this,
-                it
-            ) != PackageManager.PERMISSION_GRANTED
+        val notGranted = requiredPermissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-
-        if (notGrantedPermissions.isNotEmpty()) {
-            permissionLauncher.launch(notGrantedPermissions.toTypedArray())
+        if (notGranted.isNotEmpty()) {
+            permissionLauncher.launch(notGranted.toTypedArray())
         }
     }
 
-    // ===============================
-    // Handle Back Press
-    // ===============================
+    // ── Back Press ───────────────────────────────────────────────────────
+
     private fun setupBackPressedHandler() {
-
         onBackPressedDispatcher.addCallback(this) {
-
             if (binding.drawerLayout.isDrawerOpen(binding.navigationView)) {
                 binding.drawerLayout.closeDrawer(binding.navigationView)
             } else {
