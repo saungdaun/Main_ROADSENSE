@@ -286,4 +286,43 @@
     <string name="session_options">Pilihan Sesi</string>
     <string name="recording_active">⏺ Merekam suara...</string>
     <string name="segment_badge">Segmen #%1$d — %2$s</string>
+
+    <!-- About Fragment -->
+    <string name="about_road_condition_survey_system">Road Condition Survey System</string>
+    <string name="about_developer_section">DEVELOPER</string>
+    <string name="about_developed_by">Developed by</string>
+    <string name="about_developer_name">saungdaun</string>
+    <string name="about_organization_label">Organization</string>
+    <string name="about_organization_value">Independent Developer</string>
+    <string name="about_copyright_label">Copyright</string>
+    <string name="about_source_code_section">SOURCE CODE</string>
+    <string name="about_github_repo_title">GitHub Repository</string>
+    <string name="about_github_repo_url">github.com/saungdaun/Main_ROADSENSE</string>
+    <string name="about_standards_section">STANDAR &amp; METODOLOGI</string>
+    <string name="about_sdi_survey_label">SDI Survey</string>
+    <string name="about_sdi_survey_value">Bina Marga PD T-05-2005-B</string>
+    <string name="about_pci_survey_label">PCI Survey</string>
+    <string name="about_pci_survey_value">ASTM D6433-11</string>
+    <string name="about_ai_model_label">AI Deteksi Kerusakan</string>
+    <string name="about_ai_model_value">MobileNetV3 + RDD2022</string>
+    <string name="about_methodology_label">Methodology</string>
+    <string name="about_methodology_value">Simplified visual pavement condition assessment</string>
+    <string name="about_tech_section">TEKNOLOGI</string>
+    <string name="about_platform_label">Platform</string>
+    <string name="about_platform_value">Android (minSdk 26)</string>
+    <string name="about_language_label">Language</string>
+    <string name="about_language_value">Kotlin + Coroutines</string>
+    <string name="about_architecture_label">Architecture</string>
+    <string name="about_architecture_value">MVVM + Hilt + Room</string>
+    <string name="about_ai_inference_label">AI Inference</string>
+    <string name="about_ai_inference_value">TensorFlow Lite (on-device)</string>
+    <string name="about_maps_label">Maps</string>
+    <string name="about_maps_value">OpenStreetMap + OSMDroid</string>
+    <string name="about_disclaimer">This application is intended as a field survey assistance tool. Not a substitute for official engineering inspection or certified assessment.</string>
+    <string name="about_license">Open Source — MIT License</string>
+    <string name="about_footer">RoadSense Basic · Field Pavement Survey Tool</string>
+
+    <string name="version_format">Version %s</string>
+    <string name="build_format">Build %d · %d</string>
+    <string name="copyright_format">© %d RoadSense Basic. Developed by SaungDaun.</string>
 </resources>

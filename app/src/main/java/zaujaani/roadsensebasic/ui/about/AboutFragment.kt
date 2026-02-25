@@ -6,9 +6,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.fragment.app.Fragment
-import com.google.android.material.card.MaterialCardView
 import dagger.hilt.android.AndroidEntryPoint
 import zaujaani.roadsensebasic.BuildConfig
 import zaujaani.roadsensebasic.R
@@ -48,7 +46,6 @@ class AboutFragment : Fragment() {
     }
 
     private fun setupVersionInfo() {
-        // Version dari BuildConfig (otomatis dari build.gradle)
         val versionName = try {
             BuildConfig.VERSION_NAME
         } catch (e: Exception) {
@@ -61,12 +58,15 @@ class AboutFragment : Fragment() {
             1
         }
 
-        binding.tvVersion.text = "Version $versionName"
-        binding.tvBuildDate.text = "Build $versionCode · ${Calendar.getInstance().get(Calendar.YEAR)}"
-
+        binding.tvVersion.text = getString(R.string.version_format, versionName)
         val year = Calendar.getInstance().get(Calendar.YEAR)
-        binding.tvCopyright.text = "© $year saungdaun"
-        binding.tvFooterCopyright.text = "© $year saungdaun · RoadSense Basic"
+        binding.tvBuildDate.text = getString(R.string.build_format, versionCode, year)
+
+        // Copyright profesional
+        binding.tvCopyright.text = getString(R.string.copyright_format, year)
+
+        // Footer (sudah pakai string resource di XML, tapi kita set ulang jika perlu)
+        binding.tvFooterCopyright.text = getString(R.string.about_footer)
     }
 
     private fun setupGithubLink() {

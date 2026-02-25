@@ -19,18 +19,17 @@
             android:background="?attr/colorPrimary"
             android:padding="24dp">
 
-            <!-- Logo / Icon App -->
             <ImageView
                 android:layout_width="72dp"
                 android:layout_height="72dp"
                 android:src="@mipmap/ic_launcher_round"
-                android:contentDescription="RoadSense logo" />
+                android:contentDescription="@string/app_name" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="RoadSense Basic"
+                android:text="@string/app_name"
                 android:textColor="@android:color/white"
                 android:textSize="26sp"
                 android:textStyle="bold"
@@ -40,7 +39,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="Road Condition Survey System"
+                android:text="@string/about_road_condition_survey_system"
                 android:textColor="#CCffffff"
                 android:textSize="13sp" />
 
@@ -93,7 +92,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="DEVELOPER"
+                android:text="@string/about_developer_section"
                 android:textSize="11sp"
                 android:textAllCaps="true"
                 android:textColor="?attr/colorPrimary"
@@ -117,7 +116,6 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- Developer name row -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -129,14 +127,14 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Developed by"
+                        android:text="@string/about_developed_by"
                         android:textSize="13sp"
                         android:textColor="?android:attr/textColorSecondary" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="saungdaun"
+                        android:text="@string/about_developer_name"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="?android:attr/textColorPrimary" />
@@ -148,7 +146,6 @@
                     android:layout_height="1dp"
                     android:background="?android:attr/listDivider" />
 
-                <!-- Organization row -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -160,14 +157,14 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Organization"
+                        android:text="@string/about_organization_label"
                         android:textSize="13sp"
                         android:textColor="?android:attr/textColorSecondary" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Independent Developer"
+                        android:text="@string/about_organization_value"
                         android:textSize="14sp"
                         android:textColor="?android:attr/textColorPrimary" />
 
@@ -178,7 +175,6 @@
                     android:layout_height="1dp"
                     android:background="?android:attr/listDivider" />
 
-                <!-- Copyright row -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -190,7 +186,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Copyright"
+                        android:text="@string/about_copyright_label"
                         android:textSize="13sp"
                         android:textColor="?android:attr/textColorSecondary" />
 
@@ -219,7 +215,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="SOURCE CODE"
+                android:text="@string/about_source_code_section"
                 android:textSize="11sp"
                 android:textAllCaps="true"
                 android:textColor="?attr/colorPrimary"
@@ -255,7 +251,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="GitHub Repository"
+                        android:text="@string/about_github_repo_title"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="?android:attr/textColorPrimary" />
@@ -264,7 +260,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="github.com/saungdaun/Main_ROADSENSE"
+                        android:text="@string/about_github_repo_url"
                         android:textSize="12sp"
                         android:textColor="?attr/colorPrimary" />
 
@@ -274,7 +270,7 @@
                     android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:src="@android:drawable/ic_menu_share"
-                    android:contentDescription="Open GitHub" />
+                    android:contentDescription="@string/about_github_repo_title" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -291,7 +287,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="STANDAR &amp; METODOLOGI"
+                android:text="@string/about_standards_section"
                 android:textSize="11sp"
                 android:textAllCaps="true"
                 android:textColor="?attr/colorPrimary"
@@ -325,14 +321,14 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="SDI Survey"
+                        android:text="@string/about_sdi_survey_label"
                         android:textSize="13sp"
                         android:textColor="?android:attr/textColorSecondary" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Bina Marga PD T-05-2005-B"
+                        android:text="@string/about_sdi_survey_value"
                         android:textSize="13sp"
                         android:textColor="?android:attr/textColorPrimary" />
 
@@ -351,14 +347,14 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="PCI Survey"
+                        android:text="@string/about_pci_survey_label"
                         android:textSize="13sp"
                         android:textColor="?android:attr/textColorSecondary" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="ASTM D6433-11"
+                        android:text="@string/about_pci_survey_value"
                         android:textSize="13sp"
                         android:textColor="?android:attr/textColorPrimary" />
 
@@ -377,16 +373,43 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="AI Deteksi Kerusakan"
+                        android:text="@string/about_ai_model_label"
                         android:textSize="13sp"
                         android:textColor="?android:attr/textColorSecondary" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="MobileNetV3 + RDD2022"
+                        android:text="@string/about_ai_model_value"
                         android:textSize="13sp"
                         android:textColor="?android:attr/textColorPrimary" />
+
+                </LinearLayout>
+
+                <!-- Methodology -->
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="?android:attr/listDivider" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingVertical="8dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/about_methodology_label"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/about_methodology_value"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:maxWidth="200dp" />
 
                 </LinearLayout>
 
@@ -405,7 +428,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="TEKNOLOGI"
+                android:text="@string/about_tech_section"
                 android:textSize="11sp"
                 android:textAllCaps="true"
                 android:textColor="?attr/colorPrimary"
@@ -428,56 +451,152 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="6dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Platform" android:textSize="13sp" android:textColor="?android:attr/textColorSecondary" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Android (minSdk 26)" android:textSize="13sp" android:textColor="?android:attr/textColorPrimary" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingVertical="6dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/about_platform_label"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/about_platform_value"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorPrimary" />
                 </LinearLayout>
 
                 <View android:layout_width="match_parent" android:layout_height="1dp" android:background="?android:attr/listDivider" />
 
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="6dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Language" android:textSize="13sp" android:textColor="?android:attr/textColorSecondary" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Kotlin + Coroutines" android:textSize="13sp" android:textColor="?android:attr/textColorPrimary" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingVertical="6dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/about_language_label"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/about_language_value"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorPrimary" />
                 </LinearLayout>
 
                 <View android:layout_width="match_parent" android:layout_height="1dp" android:background="?android:attr/listDivider" />
 
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="6dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Architecture" android:textSize="13sp" android:textColor="?android:attr/textColorSecondary" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="MVVM + Hilt + Room" android:textSize="13sp" android:textColor="?android:attr/textColorPrimary" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingVertical="6dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/about_architecture_label"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/about_architecture_value"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorPrimary" />
                 </LinearLayout>
 
                 <View android:layout_width="match_parent" android:layout_height="1dp" android:background="?android:attr/listDivider" />
 
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="6dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="AI Inference" android:textSize="13sp" android:textColor="?android:attr/textColorSecondary" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="TensorFlow Lite (on-device)" android:textSize="13sp" android:textColor="?android:attr/textColorPrimary" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingVertical="6dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/about_ai_inference_label"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/about_ai_inference_value"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorPrimary" />
                 </LinearLayout>
 
                 <View android:layout_width="match_parent" android:layout_height="1dp" android:background="?android:attr/listDivider" />
 
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="6dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Maps" android:textSize="13sp" android:textColor="?android:attr/textColorSecondary" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="OpenStreetMap + OSMDroid" android:textSize="13sp" android:textColor="?android:attr/textColorPrimary" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingVertical="6dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/about_maps_label"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/about_maps_value"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorPrimary" />
                 </LinearLayout>
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ── License footer ───────────────────────────────────────── -->
+        <!-- Disclaimer -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="8dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/about_disclaimer"
+                android:textSize="12sp"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textStyle="italic"
+                android:lineSpacingExtra="4dp"
+                android:gravity="center" />
+
+        </LinearLayout>
+
+        <!-- License & Footer -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:gravity="center"
             android:paddingHorizontal="24dp"
-            android:paddingTop="28dp"
+            android:paddingTop="12dp"
             android:paddingBottom="32dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Open Source — MIT License"
+                android:text="@string/about_license"
                 android:textSize="12sp"
                 android:textColor="?android:attr/textColorSecondary"
                 android:textStyle="italic" />
@@ -487,7 +606,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="© 2026 saungdaun · RoadSense Basic"
+                android:text="@string/about_footer"
                 android:textSize="12sp"
                 android:textColor="?android:attr/textColorSecondary" />
 
