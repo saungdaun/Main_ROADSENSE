@@ -192,6 +192,8 @@ RoadSenseBasic is the foundation of a broader digital pavement management ecosys
 
 This repository represents the mobile survey core.
 
+https://youtube.com/shorts/Sfvw6FEV6k4?si=Pi8V1ePa-E9JthEm
+
 🚀 Future Development
 
 Cloud synchronization (Firebase / backend API)
