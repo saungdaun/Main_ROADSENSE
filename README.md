@@ -1,5 +1,6 @@
 # 🚧 RoadSenseBasic
-Digital Pavement Condition Survey & PCI Engine for Android
+
+An Android-based field survey system for digitizing Pavement Condition Index (PCI) and Surface Distress Index (SDI) evaluation toward scalable Pavement Management Systems (PMS).
 
 A field-ready prototype for mobile road condition assessment and Pavement Management System (PMS) research.  
 Built as a foundation toward scalable digital pavement management solutions.
@@ -10,9 +11,10 @@ Built as a foundation toward scalable digital pavement management solutions.
 🗺 Field Survey, Mapping & PCI Evaluation
 
 <p align="center">
-  <img src="screenshots/map_1.png" width="220"/>
-  <img src="screenshots/survey_detail_screen.png" width="220"/>
-  <img src="screenshots/pci_2.png" width="220"/>
+  <img src="screenshots/Foto_1.png" width="220"/>
+  <img src="screenshots/Foto_2.png" width="220"/>
+  <img src="screenshots/Foto_3.png" width="220"/>
+  <img src="screenshots/Foto_5.png" width="220"/>
 </p>
 
 
@@ -180,6 +182,18 @@ GPS enabled
 
 Storage permission for report export
 
+🧭 RoadSense Ecosystem Vision
+
+RoadSenseBasic is the foundation of a broader digital pavement management ecosystem:
+
+• RoadSenseBasic – Mobile survey engine (open-source)
+• RoadSensePro – Advanced analytics & cloud dashboard (planned)
+• RoadSenseCloud – Centralized PMS monitoring system (future vision)
+
+This repository represents the mobile survey core.
+
+https://youtube.com/shorts/Sfvw6FEV6k4?si=Pi8V1ePa-E9JthEm
+
 🚀 Future Development
 
 Cloud synchronization (Firebase / backend API)
@@ -218,8 +232,14 @@ OpenStreetMap data is licensed under the Open Database License (ODbL).
 This application is a research and development prototype.
 It is not intended for official engineering decisions without proper validation and calibration.
 
+📖 Citation
+
+If you use this project for research, please cite:
+
+Hatta (2026). RoadSenseBasic: Digital Pavement Condition Survey & PCI Engine for Android. GitHub Repository.
+
 👨‍💻 Author
 
-Developed by Hatta
+Developed by Hatta Zaujaani
 saungdaun@gmail.com
 Road Infrastructure & Urban Planning Enthusiast
