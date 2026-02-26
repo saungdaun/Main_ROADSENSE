@@ -1,4 +1,4 @@
-# 🚧 RoadSenseBasic
+🚧 RoadSenseBasic
 
 An Android-based field survey system for digitizing Pavement Condition Index (PCI) and Surface Distress Index (SDI) evaluation toward scalable Pavement Management Systems (PMS).
 
@@ -6,9 +6,10 @@ A field-ready prototype for mobile road condition assessment and Pavement Manage
 Built as a foundation toward scalable digital pavement management solutions.
 
 
+
 📸 Application Preview
 
-🗺 Field Survey, Mapping & PCI Evaluation
+🗺 **Field Survey, Mapping & PCI Evaluation**
 
 <p align="center">
   <img src="screenshots/Foto_1.png" width="220"/>
@@ -21,22 +22,23 @@ Built as a foundation toward scalable digital pavement management solutions.
 
 
 
-### 1️⃣ GPS-Based Road Survey
-- Real-time GPS tracking
-- Road segment mapping
-- Continuous foreground tracking service
+We invite practitioners, researchers, and developers to participate in the field testing program of RoadSenseBasic.
 
-### 2️⃣ Surface & Distress Recording
-- Surface distribution (Asphalt / Concrete)
-- Segment-based condition classification
-- Photo documentation per STA
+By joining as a beta tester, you will:
 
-### 3️⃣ Automated PCI Engineering Output
-- PCI score (0–100 scale)
-- Condition categorization
-- Recommended treatment logic
-- Segment-level breakdown
-- PDF export capability
+✅ Evaluate PCI/SDI accuracy under real road conditions
+
+✅ Provide direct feedback to improve system features
+
+✅ Gain early access to upcoming enhancements
+
+✅ Contribute to research in digital pavement management systems
+
+📋 Apply here: https://forms.gle/9CoMia6oDdd379fn6
+
+💬 Discussion & feedback: https://github.com/saungdaun/Main_ROADSENSE/discussions
+
+⭐ Star the repository to stay updated with future developments
 
 🌍 Why This Project Matters
 
@@ -51,197 +53,165 @@ RoadSenseBasic provides a lightweight, mobile-first digital solution for:
 
 This project serves as a prototype toward a smarter and more scalable Pavement Management System (PMS).
 
+
+
 📌 Key Features
-🗺️ GPS-Based Road Survey
 
-Real-time GPS tracking
+1️⃣ GPS-Based Road Survey
+- Real-time GPS tracking
+- Road segment mapping
+- Continuous foreground tracking service
 
-Road segment mapping
+2️⃣ Surface & Distress Recording
+- Surface distribution (Asphalt / Concrete)
+- Segment-based condition classification
+- Photo documentation per STA
 
-Survey session recording
-
-Foreground service for continuous tracking
-
-📊 Pavement Condition Index (PCI)
-
-Distress type classification
-
-Distress severity input
-
-Automatic PCI calculation engine
-
-Segment-based PCI aggregation
-
-📉 Surface Distress Index (SDI)
-
-Automated SDI computation
-
-Integrated survey engine
-
-Road condition categorization
-
-🧮 Calculation Engine
-
-Modular PCI calculator
-
-SDI computation module
-
-Domain-layer separation
-
-Extensible evaluation logic
-
-🗄️ Local Database (Room)
-
-Versioned schema migration
-
-RoadSegment entity
-
-Distress entities
-
-Survey session management
-
-📄 Export & Reporting
-
-PDF export capability
-
-File exporter utility
-
-Survey summary dashboard
+3️⃣ Automated PCI Engineering Output
+- PCI score (0–100 scale)
+- Condition categorization
+- Recommended treatment logic
+- Segment-level breakdown
+- PDF export capability
 
 🧠 Core Strengths
+- Field-ready architecture designed for real-time survey workflow
+- Modular PCI & SDI computation engine
+- Database schema versioning for data consistency
+- Clear separation between UI, domain logic, and persistence layer
 
-Field-ready architecture designed for real-time survey workflow
 
-Modular PCI & SDI computation engine
-
-Database schema versioning for data consistency
-
-Clear separation between UI, domain logic, and persistence layer
 
 📘 Engineering Context
 
-The Pavement Condition Index (PCI) method is widely used to assess road surface performance based on distress type, severity, and density.
+The Pavement Condition Index (PCI) method is widely used to assess road surface performance based on distress type, severity, and density.  
 This application digitizes the evaluation process and integrates it with segment-based road tracking and automated computation.
+
+
 
 🏗️ Architecture
 
 This project follows a clean layered architecture:
-
 UI Layer
-   ↓
+↓
 ViewModel
-   ↓
+↓
 Repository
-   ↓
+↓
 Domain Engine (PCI / SDI)
-   ↓
-Room Database
-Technologies Used
-
-Kotlin
-
-Android Jetpack
-
+↓
 Room Database
 
-Foreground Service
+Technologies Used:
 
-MVVM Architecture
+- Kotlin
+- Android Jetpack
+- Room Database
+- Foreground Service
+- MVVM Architecture
+
+
 
 📂 Project Structure Overview
 data/
- ├── local/
- │    ├── dao/
- │    ├── entity/
- │    └── RoadSenseDatabase.kt
+├── local/
+│ ├── dao/
+│ ├── entity/
+│ └── RoadSenseDatabase.kt
 
 domain/
- └── engine/
-      ├── Pcicalculator.kt
-      └── SDICalculator.kt
+└── engine/
+├── Pcicalculator.kt
+└── SDICalculator.kt
 
 ui/
- ├── map/
- ├── distress/
- └── summary/
+├── map/
+├── distress/
+└── summary/
+
+
+
+
 🎯 Target Use Cases
 
-Road infrastructure monitoring
+- Road infrastructure monitoring
+- Pavement condition surveys
+- Local government field inspection
+- Academic research (Urban Planning / Civil Engineering)
+- Smart road inspection prototype development
 
-Pavement condition surveys
 
-Local government field inspection
-
-Academic research (Urban Planning / Civil Engineering)
-
-Smart road inspection prototype development
 
 📱 Minimum Requirements
 
-Android 8.0+
+- Android 8.0+
+- GPS enabled
+- Storage permission for report export
 
-GPS enabled
 
-Storage permission for report export
 
 🧭 RoadSense Ecosystem Vision
 
-RoadSenseBasic is the foundation of a broader digital pavement management ecosystem:
+**RoadSenseBasic** is the foundation of a broader digital pavement management ecosystem:
 
-• RoadSenseBasic – Mobile survey engine (open-source)
-• RoadSensePro – Advanced analytics & cloud dashboard (planned)
-• RoadSenseCloud – Centralized PMS monitoring system (future vision)
+- **RoadSenseBasic** – Mobile survey engine (open-source)
+- **RoadSensePro** – Advanced analytics & cloud dashboard (planned)
+- **RoadSenseCloud** – Centralized PMS monitoring system (future vision)
 
 This repository represents the mobile survey core.
 
-https://youtube.com/shorts/Sfvw6FEV6k4?si=Pi8V1ePa-E9JthEm
+📺 **Demo Video:** [YouTube Short](https://youtube.com/shorts/Sfvw6FEV6k4?si=Pi8V1ePa-E9JthEm)
+
+---
 
 🚀 Future Development
 
-Cloud synchronization (Firebase / backend API)
+- Cloud synchronization (Firebase / backend API)
+- GIS integration
+- Multi-user survey system
+- Analytical dashboard
+- Web-based monitoring panel
 
-GIS integration
-
-Multi-user survey system
-
-Analytical dashboard
-
-Web-based monitoring panel
+---
 
 📌 Project Status
 
-🟢 Active Development
+🟢 **Active Development**  
+Schema Version: `v9`  
+PCI Engine: Implemented  
+SDI Engine: Implemented  
+PDF Export: Available  
 
-Schema Version: v9
+---
 
-PCI Engine: Implemented
-
-SDI Engine: Implemented
-
-PDF Export: Available
-
-Map Data & Attribution
+🗺️ Map Data & Attribution
 
 This application uses map data from OpenStreetMap.
 
 © OpenStreetMap contributors  
-https://www.openstreetmap.org
+[https://www.openstreetmap.org](https://www.openstreetmap.org)
 
 OpenStreetMap data is licensed under the Open Database License (ODbL).
 
+---
+
 ⚠ Disclaimer
 
-This application is a research and development prototype.
+This application is a research and development prototype.  
 It is not intended for official engineering decisions without proper validation and calibration.
+
+
 
 📖 Citation
 
 If you use this project for research, please cite:
 
-Hatta (2026). RoadSenseBasic: Digital Pavement Condition Survey & PCI Engine for Android. GitHub Repository.
+> Hatta (2026). RoadSenseBasic: Digital Pavement Condition Survey & PCI Engine for Android. GitHub Repository.
+
+
 
 👨‍💻 Author
 
-Developed by Hatta Zaujaani
-saungdaun@gmail.com
+Developed by **Hatta Zaujaani**  
+📧 saungdaun@gmail.com  
 Road Infrastructure & Urban Planning Enthusiast
