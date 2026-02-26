@@ -1,6 +1,7 @@
 🚧 RoadSenseBasic
 
 An Android-based field survey system for digitizing Pavement Condition Index (PCI) and Surface Distress Index (SDI) evaluation toward scalable Pavement Management Systems (PMS).
+Designed for real-world field deployment in developing infrastructure environments.
 
 A field-ready prototype for mobile road condition assessment and Pavement Management System (PMS) research.  
 Built as a foundation toward scalable digital pavement management solutions.
@@ -110,25 +111,23 @@ Technologies Used:
 - Foreground Service
 - MVVM Architecture
 
-
-
 📂 Project Structure Overview
+
 data/
-├── local/
-│ ├── dao/
-│ ├── entity/
-│ └── RoadSenseDatabase.kt
+ ├── local/
+ │   ├── dao/
+ │   ├── entity/
+ │   └── RoadSenseDatabase.kt
 
 domain/
-└── engine/
-├── Pcicalculator.kt
-└── SDICalculator.kt
+ └── engine/
+     ├── Pcicalculator.kt
+     └── SDICalculator.kt
 
 ui/
-├── map/
-├── distress/
-└── summary/
-
+ ├── map/
+ ├── distress/
+ └── summary/
 
 
 
@@ -160,9 +159,8 @@ ui/
 
 This repository represents the mobile survey core.
 
-📺 **Demo Video:** [YouTube Short](https://youtube.com/shorts/Sfvw6FEV6k4?si=Pi8V1ePa-E9JthEm)
-
----
+📺 Demo Video:
+https://youtube.com/shorts/Sfvw6FEV6k4
 
 🚀 Future Development
 
@@ -172,7 +170,12 @@ This repository represents the mobile survey core.
 - Analytical dashboard
 - Web-based monitoring panel
 
----
+📊 Validation Roadmap
+
+Planned validation:
+- Comparative testing against manual PCI survey
+- Multi-device accuracy testing
+- Calibration across different road classes//taruh dimana
 
 📌 Project Status
 
